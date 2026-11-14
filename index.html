@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Mehmet Karadeniz, 2026-2027">
+<title>Sonra Bak</title>
+<meta name="theme-color" content="#e2572b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sonra Bak">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#f5f3ee;--card:#fff;--ink:#1d1d1f;--muted:#6b6b70;--line:#e4e1da;
+  --acc:#e2572b;--acc2:#fde8df;--ok:#2f8f5b;--chip:#efece6;--shadow:0 1px 2px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.05);
+}
+body.dark{
+  --bg:#141416;--card:#1f1f23;--ink:#f2f2f4;--muted:#9a9aa3;--line:#2e2e34;
+  --acc:#ff7a4d;--acc2:#3a2219;--ok:#5cc58a;--chip:#2a2a30;--shadow:0 1px 2px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.4;min-height:100vh}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;gap:8px}
+.logo{font-weight:800;font-size:19px;letter-spacing:-.3px;display:flex;align-items:baseline;gap:6px;flex:1;min-width:0}
+.logo span.dot{color:var(--acc)}
+.ver{font-size:11px;font-weight:600;color:var(--muted);background:var(--chip);padding:2px 6px;border-radius:6px}
+.hbtn{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:var(--card);box-shadow:var(--shadow)}
+.hbtn:active{transform:scale(.95)}
+main{max-width:720px;margin:0 auto;padding:12px 14px 110px}
+.card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:14px}
+.add textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg);resize:none;min-height:52px;outline:none}
+.add textarea:focus,.field:focus{border-color:var(--acc)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field{border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg);outline:none;min-width:0}
+.more{display:none;margin-top:8px;gap:8px;flex-direction:column}
+.more.open{display:flex}
+.btn{padding:10px 16px;border-radius:11px;font-weight:650;background:var(--chip)}
+.btn.pri{background:var(--acc);color:#fff}
+.btn.sm{padding:6px 11px;font-size:13px;border-radius:9px}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5}
+.lnk{color:var(--acc);font-weight:600;font-size:13px}
+.search{margin:14px 0 10px;position:relative}
+.search input{width:100%;padding:11px 14px 11px 38px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);outline:none}
+.search::before{content:"🔍";position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;opacity:.6}
+.cats{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.cats::-webkit-scrollbar{display:none}
+.cat{flex:none;padding:7px 12px;border-radius:999px;background:var(--card);box-shadow:var(--shadow);font-weight:600;font-size:14px;white-space:nowrap}
+.cat b{font-weight:700;color:var(--muted);margin-left:4px;font-size:12px}
+.cat.on{background:var(--ink);color:var(--bg)}
+.cat.on b{color:var(--bg);opacity:.7}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.tile{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:12px;text-align:left;display:flex;flex-direction:column;gap:4px}
+.tile .e{font-size:24px}
+.tile .n{font-weight:700}
+.tile .c{color:var(--muted);font-size:13px}
+.sec{display:flex;justify-content:space-between;align-items:center;margin:6px 2px 8px}
+.sec h2{font-size:15px;margin:0;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.filters{display:flex;gap:6px}
+.f{font-size:12px;padding:4px 9px;border-radius:8px;background:var(--chip);font-weight:600}
+.f.on{background:var(--acc2);color:var(--acc)}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:12px 12px 10px;display:flex;gap:11px}
+.item.read{opacity:.62}
+.pf{flex:none;width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:19px;color:#fff;font-weight:800}
+.body{flex:1;min-width:0}
+.t{font-weight:650;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:inherit;text-decoration:none}
+.meta{color:var(--muted);font-size:12.5px;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.note{font-size:13.5px;margin-top:5px;background:var(--bg);border-radius:8px;padding:6px 8px;white-space:pre-wrap;word-break:break-word}
+.chipb{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);font-weight:600}
+.acts{display:flex;gap:2px;margin-top:6px;margin-left:-6px}
+.ib{padding:5px 8px;border-radius:8px;font-size:15px}
+.ib:active{background:var(--chip)}
+.empty{text-align:center;color:var(--muted);padding:34px 10px}
+.empty .big{font-size:40px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(80px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px;transition:.25s;z-index:60;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:40;display:none;align-items:flex-end;justify-content:center}
+.sheet-bg.open{display:flex}
+.sheet{background:var(--card);width:100%;max-width:720px;border-radius:20px 20px 0 0;padding:16px 16px 26px;max-height:88vh;overflow:auto}
+.sheet h3{margin:0 0 12px;font-size:18px}
+.opt{display:flex;align-items:center;gap:10px;width:100%;padding:11px 10px;border-radius:10px;text-align:left;font-weight:600}
+.opt:active,.opt.on{background:var(--chip)}
+.crow{display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.crow input.em{width:46px;text-align:center}
+.crow input.nm{flex:1}
+.kw{width:100%;font-size:13px;margin-top:4px}
+.stat{font-size:12px;color:var(--muted);text-align:center;margin-top:18px}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px}
+@keyframes s{to{transform:rotate(360deg)}}
+label.tg{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted)}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.0</span></div>
+  <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
+  <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
+  <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
+</header>
+
+<main>
+  <section class="card add">
+    <textarea id="inUrl" rows="2" placeholder="Linki veya metni buraya yapıştır (Instagram, YouTube, site…)"></textarea>
+    <div class="more" id="more">
+      <input class="field" id="inTitle" placeholder="Başlık (boş bırakırsan otomatik)">
+      <textarea class="field" id="inNote" rows="2" placeholder="Not: neden kaydettin?"></textarea>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select class="field" id="inCat" style="flex:1"></select>
+      <button class="btn" id="btnMore" title="Başlık / not ekle">✏️</button>
+      <button class="btn pri" id="btnSave">Kaydet</button>
+    </div>
+    <div class="row" style="margin-top:8px;justify-content:space-between">
+      <label class="tg" id="aiWrap" style="display:none"><input type="checkbox" id="aiOn" checked> Claude ile akıllı kategori</label>
+      <span class="badge" id="syncBadge">⏳ Bağlanıyor…</span>
+    </div>
+  </section>
+
+  <div class="search"><input id="q" type="search" placeholder="Kayıtlarda ara…"></div>
+
+  <div class="cats" id="catBar"></div>
+
+  <div id="home"></div>
+
+  <div class="sec">
+    <h2 id="listTitle">Son kaydedilenler</h2>
+    <div class="filters">
+      <button class="f on" data-f="all">Tümü</button>
+      <button class="f" data-f="unread">Bakılmadı</button>
+      <button class="f" data-f="fav">⭐</button>
+    </div>
+  </div>
+  <div class="list" id="list"></div>
+
+  <div class="stat" id="stat"></div>
+  <div class="row" style="justify-content:center;margin-top:10px;gap:14px">
+    <button class="lnk" id="btnExport">Yedek indir</button>
+    <button class="lnk" id="btnImport">Yedek yükle</button>
+  </div>
+  <footer>© Mehmet Karadeniz, 2026-2027</footer>
+</main>
+
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+const VERSION = "1.0";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const trLower = s => String(s || "").toLocaleLowerCase("tr");
+
+/* ---------- Varsayılan kategoriler ---------- */
+const DEFAULT_CATS = [
+  {id:"egitim",  emoji:"🎓", name:"Eğitim",          kw:"eğitim,ders,öğretmen,öğrenci,sınav,meb,okul,etkinlik,çalışma kağıdı,müfredat,maarif,lgs,yks,kpss,kurs,öğren"},
+  {id:"teknoloji",emoji:"💻", name:"Yazılım & Teknoloji", kw:"github,kod,yazılım,python,javascript,react,html,css,api,firebase,yapay zeka,ai,claude,chatgpt,android,apk,linux,programlama,uygulama,developer,stackoverflow"},
+  {id:"yemek",   emoji:"🍲", name:"Yemek & Tarif",    kw:"tarif,yemek,tatlı,çorba,mutfak,pasta,kek,börek,recipe,yemekleri,nasıl yapılır,lezzet"},
+  {id:"okuma",   emoji:"📖", name:"Makale & Okuma",   kw:"makale,blog,yazı,medium,substack,kitap,okuma,röportaj,inceleme,wikipedia"},
+  {id:"video",   emoji:"🎬", name:"Video",            kw:""},
+  {id:"saglik",  emoji:"💪", name:"Sağlık & Spor",    kw:"sağlık,spor,egzersiz,diyet,fitness,yürüyüş,koşu,beslenme,uyku,antrenman"},
+  {id:"alisveris",emoji:"🛒", name:"Alışveriş",       kw:"trendyol,hepsiburada,amazon,n11,ürün,fiyat,indirim,satın,sepet,kampanya,aliexpress,temu"},
+  {id:"haber",   emoji:"📰", name:"Haber",            kw:"haber,son dakika,gündem,hurriyet,sozcu,ntv,cnnturk,bbc,milliyet,sabah,aa.com.tr,habertürk"},
+  {id:"ilham",   emoji:"✨", name:"İlham & Fikir",    kw:"fikir,ilham,tasarım,design,dekorasyon,diy,kendin yap,pinterest,dribbble,behance"},
+  {id:"diger",   emoji:"📦", name:"Diğer",            kw:""}
+];
+
+/* ---------- Platform tespiti ---------- */
+const PLATFORMS = [
+  {k:"youtube",  re:/(youtube\.com|youtu\.be)/i, label:"YouTube",   ic:"▶", bg:"#ff0033", cat:"video"},
+  {k:"instagram",re:/instagram\.com/i,           label:"Instagram", ic:"◎", bg:"linear-gradient(135deg,#f9a03f,#e1306c,#833ab4)", cat:"ilham"},
+  {k:"tiktok",   re:/tiktok\.com/i,              label:"TikTok",    ic:"♪", bg:"#111", cat:"video"},
+  {k:"x",        re:/(twitter\.com|\/\/x\.com|\.x\.com)/i, label:"X", ic:"𝕏", bg:"#000", cat:"haber"},
+  {k:"facebook", re:/(facebook\.com|fb\.watch)/i,label:"Facebook",  ic:"f", bg:"#1877f2", cat:null},
+  {k:"linkedin", re:/linkedin\.com/i,            label:"LinkedIn",  ic:"in", bg:"#0a66c2", cat:"teknoloji"},
+  {k:"github",   re:/github\.(com|io)/i,         label:"GitHub",    ic:"⌥", bg:"#24292f", cat:"teknoloji"},
+  {k:"reddit",   re:/reddit\.com/i,              label:"Reddit",    ic:"●", bg:"#ff4500", cat:null},
+  {k:"pinterest",re:/(pinterest\.|pin\.it)/i,    label:"Pinterest", ic:"P", bg:"#e60023", cat:"ilham"},
+  {k:"spotify",  re:/spotify\.com/i,             label:"Spotify",   ic:"♫", bg:"#1db954", cat:null},
+  {k:"web",      re:/^https?:\/\//i,             label:"Web",       ic:"🌐", bg:"#5b6b7c", cat:null},
+  {k:"text",     re:/.*/,                        label:"Not",       ic:"✎", bg:"#a07a3a", cat:null}
+];
+const platformOf = url => PLATFORMS.find(p => p.re.test(url || "")) || PLATFORMS[PLATFORMS.length - 1];
+const pByKey = k => PLATFORMS.find(p => p.k === k) || PLATFORMS[PLATFORMS.length - 1];
+
+function extractUrl(text) {
+  const m = String(text || "").match(/https?:\/\/[^\s<>"']+/i);
+  return m ? m[0].replace(/[),.;!?]+$/, "") : "";
+}
+function domainOf(url) {
+  try { return new URL(url).hostname.replace(/^www\.|^m\./, ""); } catch { return ""; }
+}
+function guessTitle(url, text) {
+  const rest = String(text || "").replace(url, "").trim();
+  if (rest) return rest.split("\n")[0].slice(0, 140);
+  if (!url) return "";
+  try {
+    const u = new URL(url);
+    const p = platformOf(url);
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (p.k === "youtube") return parts[0] === "shorts" ? "YouTube Shorts" : "YouTube videosu";
+    if (p.k === "instagram") return parts[0] === "reel" || parts[0] === "reels" ? "Instagram Reels" : parts[0] === "p" ? "Instagram gönderisi" : "Instagram: @" + (parts[0] || "");
+    if (p.k === "tiktok") return "TikTok videosu" + (parts[0] && parts[0].startsWith("@") ? " · " + parts[0] : "");
+    if (p.k === "github" && parts.length >= 2) return "GitHub · " + parts[0] + "/" + parts[1];
+    const slug = decodeURIComponent(parts[parts.length - 1] || "").replace(/\.(html?|php|aspx?)$/i, "").replace(/[-_+]+/g, " ").replace(/\b\d{5,}\b/g, "").trim();
+    if (slug.length > 5 && /[a-zçğıöşü]/i.test(slug)) return slug.charAt(0).toLocaleUpperCase("tr") + slug.slice(1);
+    return domainOf(url);
+  } catch { return text.slice(0, 140); }
+}
+
+/* ---------- Kural tabanlı kategori ---------- */
+function ruleCategory(item) {
+  const hay = trLower([item.url, item.title, item.note].join(" "));
+  let best = null, bestScore = 0;
+  for (const c of S.cats) {
+    const kws = (c.kw || "").split(",").map(s => trLower(s.trim())).filter(Boolean);
+    let score = 0;
+    for (const k of kws) if (hay.includes(k)) score += k.length > 4 ? 2 : 1;
+    if (trLower(c.name) && hay.includes(trLower(c.name))) score += 2;
+    if (score > bestScore) { bestScore = score; best = c.id; }
+  }
+  if (best) return best;
+  const p = platformOf(item.url);
+  if (p.cat && S.cats.some(c => c.id === p.cat)) return p.cat;
+  if (S.cats.some(c => c.id === "diger")) return "diger";
+  return S.cats[0]?.id || "diger";
+}
+
+/* ---------- Durum ---------- */
+const S = { items: [], cats: DEFAULT_CATS.map(c => ({...c})), sel: "home", filter: "all", q: "", mode: "local" };
+let db = null, uidv = null, itemsCol = null, catsDoc = null, sample = null;
+
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem("sonrabak_" + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("sonrabak_" + k, JSON.stringify(v)); } catch {} }
+};
+
+/* ---------- Tema ---------- */
+function applyTheme(dark) {
+  document.body.classList.toggle("dark", dark);
+  $("#btnTheme").textContent = dark ? "☀️" : "🌙";
+}
+let dark = LS.get("dark", null);
+if (dark === null) dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+applyTheme(dark);
+$("#btnTheme").onclick = () => { dark = !dark; applyTheme(dark); LS.set("dark", dark); };
+
+/* ---------- Paylaş ---------- */
+$("#btnShare").onclick = async () => {
+  const data = { title: "Sonra Bak", text: "Sonra Bak — gördüğün içerikleri kaydet, kategorilere ayır.", url: location.href };
+  try { if (navigator.share) { await navigator.share(data); return; } } catch (e) { if (e && e.name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(location.href); toast("Uygulama linki kopyalandı"); }
+  catch { toast("Paylaşmak için sayfanın Paylaş menüsünü kullan"); }
+};
+
+/* ---------- Toast ---------- */
+let tt;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2300); }
+
+/* ---------- Depolama ---------- */
+async function saveItem(it) {
+  if (S.mode === "cloud") {
+    await itemsCol.doc(it.id).set(it);
+  } else {
+    const i = S.items.findIndex(x => x.id === it.id);
+    if (i >= 0) S.items[i] = it; else S.items.unshift(it);
+    LS.set("items", S.items); render();
+  }
+}
+async function removeItem(id) {
+  if (S.mode === "cloud") await itemsCol.doc(id).delete();
+  else { S.items = S.items.filter(x => x.id !== id); LS.set("items", S.items); render(); }
+}
+async function saveCats() {
+  if (S.mode === "cloud") await catsDoc.set({ list: S.cats });
+  else LS.set("cats", S.cats);
+  render();
+}
+
+function setBadge(txt) { $("#syncBadge").textContent = txt; }
+
+function loadLocal() {
+  S.mode = "local";
+  S.items = LS.get("items", []);
+  const c = LS.get("cats", null); if (c && c.length) S.cats = c;
+  setBadge("📱 Bu cihazda saklanıyor");
+  render();
+}
+
+async function initCloud() {
+  if (!window.claude || !window.claude.use) { loadLocal(); return; }
+  try {
+    const [d, u] = await Promise.all([claude.use("db"), claude.use("user")]);
+    if (!d || !u) { loadLocal(); return; }
+    const id = await u.id();
+    if (!id) { loadLocal(); return; }
+    db = d; uidv = id;
+    const base = db.doc("data/users/" + uidv + "/meta");
+    itemsCol = base.collection("items");
+    catsDoc = db.doc("data/users/" + uidv + "/cats");
+    S.mode = "cloud";
+    setBadge("⏳ Yükleniyor…");
+    const timer = setTimeout(() => setBadge("⚠️ Bağlantı yavaş, bekleniyor…"), 10000);
+    catsDoc.onSnapshot(snap => {
+      if (snap.exists) { const l = snap.data().list; if (Array.isArray(l) && l.length) S.cats = l.map(c => ({...c})); }
+      render();
+    }, () => {});
+    itemsCol.onSnapshot(snap => {
+      if (!snap.metadata.fromCache) { clearTimeout(timer); setBadge("☁️ Hesabında saklanıyor"); }
+      S.items = snap.docs.map(d => d.data()).filter(Boolean).sort((a, b) => (b.created || 0) - (a.created || 0));
+      render();
+    }, e => { clearTimeout(timer); setBadge("⚠️ Bulut erişimi yok"); });
+    migrateLocal();
+  } catch (e) { loadLocal(); }
+}
+
+async function migrateLocal() {
+  const local = LS.get("items", []);
+  if (!local.length || LS.get("migrated", false)) return;
+  for (const it of local) { try { await itemsCol.doc(it.id).set(it); } catch {} }
+  LS.set("migrated", true);
+  toast(local.length + " kayıt hesabına taşındı");
+}
+
+async function initSample() {
+  if (!window.claude || !window.claude.use) return;
+  try {
+    sample = await claude.use("sample");
+    if (sample) { $("#aiWrap").style.display = "flex"; $("#aiOn").checked = LS.get("ai", true); }
+  } catch { sample = null; }
+}
+$("#aiOn").onchange = e => LS.set("ai", e.target.checked);
+
+/* ---------- Claude ile kategori ---------- */
+async function aiCategorize(item) {
+  if (!sample || !$("#aiOn").checked) return null;
+  const list = S.cats.map(c => `${c.id}: ${c.name}`).join("\n");
+  const prompt =
+`Bir "sonra bak" uygulaması için kaydedilen içeriği kategorilere ayırıyorsun. İnternete erişimin yok; yalnızca aşağıdaki bilgiye bak.
+Mevcut kategoriler (id: ad):
+${list}
+
+İçerik:
+URL: ${item.url || "-"}
+Başlık/metin: ${item.title || "-"}
+Not: ${item.note || "-"}
+
+Yalnızca şu JSON'u döndür:
+{"kategori":"<mevcut id>","yeni":null,"baslik":"<kısa Türkçe başlık>"}
+Kurallar: Uygun bir mevcut kategori varsa onun id'sini yaz. Hiçbiri uymuyorsa "kategori":null ve "yeni":{"ad":"<2-3 kelimelik Türkçe ad>","emoji":"<tek emoji>"} yaz. "baslik": verilen başlık anlamlıysa aynen bırak, değilse URL'den çıkarabildiğin en iyi kısa başlığı yaz; çıkaramıyorsan boş bırak.`;
+  try {
+    const r = await sample.json(prompt, { modelTier: "quick" });
+    return r && typeof r === "object" ? r : null;
+  } catch (e) {
+    if (e && e.code === "not_granted") { sample = null; $("#aiWrap").style.display = "none"; }
+    return null;
+  }
+}
+
+/* ---------- Kaydet ---------- */
+$("#btnMore").onclick = () => $("#more").classList.toggle("open");
+$("#btnSave").onclick = async () => {
+  const raw = $("#inUrl").value.trim();
+  if (!raw) { toast("Önce bir link veya metin yapıştır"); $("#inUrl").focus(); return; }
+  const btn = $("#btnSave"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+  try {
+    const url = extractUrl(raw);
+    const userTitle = $("#inTitle").value.trim();
+    const it = {
+      id: uid8(), url,
+      title: userTitle || guessTitle(url, raw) || raw.slice(0, 140),
+      note: $("#inNote").value.trim(),
+      platform: platformOf(url || "").k,
+      cat: $("#inCat").value, auto: false, read: false, fav: false, created: Date.now()
+    };
+    if (!url) it.note = it.note || (raw.length > 140 ? raw : "");
+    let catMsg = "";
+    if (it.cat === "__auto") {
+      it.auto = true;
+      const ai = await aiCategorize({ ...it, title: userTitle || raw.replace(url, "").trim() || it.title });
+      if (ai && ai.kategori && S.cats.some(c => c.id === ai.kategori)) {
+        it.cat = ai.kategori;
+      } else if (ai && ai.yeni && ai.yeni.ad) {
+        const nc = { id: "c" + uid8(), emoji: (ai.yeni.emoji || "📁").slice(0, 4), name: String(ai.yeni.ad).slice(0, 30), kw: "" };
+        S.cats.splice(Math.max(0, S.cats.length - 1), 0, nc);
+        await saveCats();
+        it.cat = nc.id; catMsg = " (yeni kategori)";
+      } else {
+        it.cat = ruleCategory(it);
+      }
+      if (ai && ai.baslik && !userTitle && ai.baslik.length > 3) it.title = String(ai.baslik).slice(0, 160);
+    }
+    await saveItem(it);
+    const c = catById(it.cat);
+    toast(`${c.emoji} ${c.name} kategorisine kaydedildi${catMsg}`);
+    $("#inUrl").value = ""; $("#inTitle").value = ""; $("#inNote").value = ""; $("#more").classList.remove("open");
+  } catch (e) {
+    toast(e && e.code === "quota_exceeded" ? "Depolama dolu, eski kayıtları sil" : "Kaydedilemedi, tekrar dene");
+  } finally { btn.disabled = false; btn.textContent = "Kaydet"; }
+};
+$("#inUrl").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#btnSave").click(); } });
+$("#inUrl").addEventListener("paste", () => setTimeout(() => {
+  const v = $("#inUrl").value; if (extractUrl(v)) $("#btnSave").focus();
+}, 0));
+
+/* ---------- Görünüm ---------- */
+const catById = id => S.cats.find(c => c.id === id) || { id, emoji: "📁", name: "Kategorisiz" };
+function countIn(id) { return S.items.filter(i => i.cat === id).length; }
+
+function fmtDate(ts) {
+  const d = new Date(ts), now = new Date();
+  const diff = (now - d) / 86400000;
+  if (diff < 1 && d.getDate() === now.getDate()) return "Bugün " + d.toLocaleTimeString("tr", { hour: "2-digit", minute: "2-digit" });
+  if (diff < 2) return "Dün";
+  return d.toLocaleDateString("tr", { day: "numeric", month: "short", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric" });
+}
+
+function render() {
+  // seçim kutusu
+  const sel = $("#inCat"), prev = sel.value || "__auto";
+  sel.innerHTML = `<option value="__auto">🤖 Otomatik kategori</option>` + S.cats.map(c => `<option value="${esc(c.id)}">${esc(c.emoji)} ${esc(c.name)}</option>`).join("");
+  sel.value = [...sel.options].some(o => o.value === prev) ? prev : "__auto";
+
+  // kategori şeridi
+  const unread = S.items.filter(i => !i.read).length;
+  $("#catBar").innerHTML =
+    `<button class="cat ${S.sel === "home" ? "on" : ""}" data-c="home">🏠 Ana sayfa</button>` +
+    `<button class="cat ${S.sel === "all" ? "on" : ""}" data-c="all">Tümü<b>${S.items.length}</b></button>` +
+    S.cats.map(c => `<button class="cat ${S.sel === c.id ? "on" : ""}" data-c="${esc(c.id)}">${esc(c.emoji)} ${esc(c.name)}<b>${countIn(c.id)}</b></button>`).join("");
+
+  // ana sayfa kutuları
+  const showHome = S.sel === "home" && !S.q;
+  $("#home").innerHTML = showHome && S.items.length ? `<div class="grid">${
+    S.cats.filter(c => countIn(c.id) > 0).map(c => {
+      const n = countIn(c.id), u = S.items.filter(i => i.cat === c.id && !i.read).length;
+      return `<button class="tile" data-c="${esc(c.id)}"><span class="e">${esc(c.emoji)}</span><span class="n">${esc(c.name)}</span><span class="c">${n} kayıt${u ? " · " + u + " bakılmadı" : ""}</span></button>`;
+    }).join("")}</div>` : "";
+
+  // liste
+  let arr = S.items.slice();
+  if (S.sel !== "home" && S.sel !== "all") arr = arr.filter(i => i.cat === S.sel);
+  if (S.filter === "unread") arr = arr.filter(i => !i.read);
+  if (S.filter === "fav") arr = arr.filter(i => i.fav);
+  if (S.q) {
+    const words = trLower(S.q).split(/\s+/).filter(Boolean);
+    arr = arr.filter(i => { const h = trLower([i.title, i.note, i.url, catById(i.cat).name, pByKey(i.platform).label].join(" ")); return words.every(w => h.includes(w)); });
+  }
+  if (showHome) arr = arr.slice(0, 15);
+
+  $("#listTitle").textContent = S.q ? `“${S.q}” için ${arr.length} sonuç`
+    : S.sel === "home" ? "Son kaydedilenler"
+    : S.sel === "all" ? "Tüm kayıtlar"
+    : catById(S.sel).emoji + " " + catById(S.sel).name;
+
+  $("#list").innerHTML = arr.length ? arr.map(itemHTML).join("") :
+    `<div class="empty"><div class="big">${S.items.length ? "🔎" : "📥"}</div>${
+      S.items.length ? "Burada kayıt yok." : "Henüz kayıt yok.<br>Instagram, YouTube ya da bir sitede <b>Paylaş → Bağlantıyı kopyala</b> de,<br>sonra yukarıya yapıştırıp <b>Kaydet</b>'e bas."}</div>`;
+
+  $("#stat").textContent = S.items.length ? `${S.items.length} kayıt · ${unread} bakılmadı` : "";
+}
+
+function itemHTML(i) {
+  const p = pByKey(i.platform), c = catById(i.cat);
+  const safeUrl = /^https?:\/\//i.test(i.url || "") ? i.url : "";
+  const titleEl = safeUrl
+    ? `<a class="t" href="${esc(safeUrl)}" target="_blank" rel="noopener" data-open="${esc(i.id)}">${esc(i.title || safeUrl)}</a>`
+    : `<div class="t">${esc(i.title || "Not")}</div>`;
+  return `<div class="item ${i.read ? "read" : ""}" data-id="${esc(i.id)}">
+    <div class="pf" style="background:${p.bg}">${p.ic}</div>
+    <div class="body">
+      ${titleEl}
+      <div class="meta">
+        <button class="chipb" data-act="cat">${esc(c.emoji)} ${esc(c.name)}${i.auto ? " 🤖" : ""}</button>
+        <span>${esc(safeUrl ? domainOf(safeUrl) : p.label)}</span><span>·</span><span>${fmtDate(i.created)}</span>
+      </div>
+      ${i.note ? `<div class="note">${esc(i.note)}</div>` : ""}
+      <div class="acts">
+        <button class="ib" data-act="read" title="Baktım">${i.read ? "↩️" : "✅"}</button>
+        <button class="ib" data-act="fav" title="Yıldızla">${i.fav ? "⭐" : "☆"}</button>
+        <button class="ib" data-act="edit" title="Düzenle">✏️</button>
+        ${safeUrl ? `<button class="ib" data-act="copy" title="Linki kopyala">🔗</button>` : ""}
+        <button class="ib" data-act="del" title="Sil">🗑️</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- Olaylar ---------- */
+document.addEventListener("click", async e => {
+  const c = e.target.closest("[data-c]");
+  if (c) { S.sel = c.dataset.c; S.q = ""; $("#q").value = ""; render(); window.scrollTo({ top: 0 }); return; }
+  const f = e.target.closest("[data-f]");
+  if (f) { S.filter = f.dataset.f; document.querySelectorAll("[data-f]").forEach(b => b.classList.toggle("on", b === f)); render(); return; }
+  const a = e.target.closest("[data-act]");
+  const op = e.target.closest("[data-open]");
+  if (op) {
+    const it = S.items.find(x => x.id === op.dataset.open);
+    if (it && !it.read) setTimeout(() => saveItem({ ...it, read: true }).catch(() => {}), 400);
+    return;
+  }
+  if (!a) return;
+  const id = a.closest("[data-id]")?.dataset.id; const it = S.items.find(x => x.id === id);
+  if (!it) return;
+  const act = a.dataset.act;
+  try {
+    if (act === "read") await saveItem({ ...it, read: !it.read });
+    else if (act === "fav") await saveItem({ ...it, fav: !it.fav });
+    else if (act === "cat") openCatPicker(it);
+    else if (act === "edit") openEdit(it);
+    else if (act === "copy") { try { await navigator.clipboard.writeText(it.url); toast("Link kopyalandı"); } catch { toast("Kopyalanamadı"); } }
+    else if (act === "del") openConfirm("Bu kayıt silinsin mi?", async () => { await removeItem(it.id); toast("Silindi"); });
+  } catch { toast("İşlem yapılamadı"); }
+});
+
+let qt;
+$("#q").addEventListener("input", e => { clearTimeout(qt); qt = setTimeout(() => { S.q = e.target.value.trim(); render(); }, 150); });
+
+/* ---------- Alt sayfalar ---------- */
+function openSheet(html) { $("#sheet").innerHTML = html; $("#sheetBg").classList.add("open"); }
+function closeSheet() { $("#sheetBg").classList.remove("open"); }
+$("#sheetBg").addEventListener("click", e => { if (e.target.id === "sheetBg") closeSheet(); });
+
+function openConfirm(msg, onYes) {
+  openSheet(`<h3>${esc(msg)}</h3><div class="row" style="justify-content:flex-end"><button class="btn" id="cNo">Vazgeç</button><button class="btn pri" id="cYes">Evet</button></div>`);
+  $("#cNo").onclick = closeSheet;
+  $("#cYes").onclick = async () => { closeSheet(); try { await onYes(); } catch { toast("Yapılamadı"); } };
+}
+
+function openCatPicker(it) {
+  openSheet(`<h3>Kategori seç</h3>${S.cats.map(c => `<button class="opt ${c.id === it.cat ? "on" : ""}" data-pick="${esc(c.id)}"><span style="font-size:20px">${esc(c.emoji)}</span>${esc(c.name)}</button>`).join("")}`);
+  $("#sheet").querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
+    closeSheet(); await saveItem({ ...it, cat: b.dataset.pick, auto: false }); toast("Kategori değişti");
+  });
+}
+
+function openEdit(it) {
+  openSheet(`<h3>Kaydı düzenle</h3>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <input class="field" id="eT" value="${esc(it.title)}" placeholder="Başlık">
+      <input class="field" id="eU" value="${esc(it.url)}" placeholder="Link">
+      <textarea class="field" id="eN" rows="3" placeholder="Not">${esc(it.note)}</textarea>
+      <select class="field" id="eC">${S.cats.map(c => `<option value="${esc(c.id)}" ${c.id === it.cat ? "selected" : ""}>${esc(c.emoji)} ${esc(c.name)}</option>`).join("")}</select>
+      <div class="row" style="justify-content:flex-end"><button class="btn" id="eX">Vazgeç</button><button class="btn pri" id="eS">Kaydet</button></div>
+    </div>`);
+  $("#eX").onclick = closeSheet;
+  $("#eS").onclick = async () => {
+    const url = $("#eU").value.trim();
+    const n = { ...it, title: $("#eT").value.trim(), url, note: $("#eN").value.trim(), cat: $("#eC").value, platform: platformOf(url).k };
+    if (n.cat !== it.cat) n.auto = false;
+    closeSheet(); try { await saveItem(n); toast("Güncellendi"); } catch { toast("Kaydedilemedi"); }
+  };
+}
+
+/* ---------- Kategori yönetimi ---------- */
+$("#btnCats").onclick = openCatManager;
+function openCatManager() {
+  const draft = S.cats.map(c => ({ ...c }));
+  const draw = () => {
+    openSheet(`<h3>Kategoriler</h3>
+      <p style="margin:-6px 0 8px;color:var(--muted);font-size:13px">Anahtar kelimeler otomatik kategoride kullanılır (virgülle ayır).</p>
+      <div id="cl">${draft.map((c, i) => `<div style="border-bottom:1px solid var(--line);padding:8px 0">
+        <div class="row" style="flex-wrap:nowrap">
+          <input class="field em" data-i="${i}" data-k="emoji" value="${esc(c.emoji)}" style="width:50px;text-align:center">
+          <input class="field nm" data-i="${i}" data-k="name" value="${esc(c.name)}" style="flex:1">
+          <button class="ib" data-up="${i}" title="Yukarı">⬆️</button>
+          <button class="ib" data-rm="${i}" title="Sil">🗑️</button>
+        </div>
+        <input class="field kw" data-i="${i}" data-k="kw" value="${esc(c.kw || "")}" placeholder="anahtar kelimeler: tarif, yemek, …">
+      </div>`).join("")}</div>
+      <div class="row" style="margin-top:12px;justify-content:space-between">
+        <button class="btn sm" id="cAdd">＋ Yeni kategori</button>
+        <div class="row"><button class="btn" id="cX">Vazgeç</button><button class="btn pri" id="cS">Kaydet</button></div>
+      </div>`);
+    $("#sheet").querySelectorAll("input[data-i]").forEach(inp => inp.oninput = () => { draft[+inp.dataset.i][inp.dataset.k] = inp.value; });
+    $("#sheet").querySelectorAll("[data-up]").forEach(b => b.onclick = () => { const i = +b.dataset.up; if (i > 0) { [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; draw(); } });
+    $("#sheet").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => {
+      const i = +b.dataset.rm, n = countIn(draft[i].id);
+      if (draft.length <= 1) { toast("En az bir kategori kalmalı"); return; }
+      if (n && !b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Emin misin?"; toast(`${n} kayıt "Diğer"e taşınacak`); return; }
+      draft.splice(i, 1); draw();
+    });
+    $("#cAdd").onclick = () => { draft.push({ id: "c" + uid8(), emoji: "📁", name: "Yeni kategori", kw: "" }); draw(); const l = $("#cl").lastElementChild; l && l.querySelector(".nm").select(); };
+    $("#cX").onclick = closeSheet;
+    $("#cS").onclick = async () => {
+      const clean = draft.map(c => ({ ...c, name: (c.name || "").trim() || "Adsız", emoji: (c.emoji || "📁").trim().slice(0, 4) }));
+      const ids = new Set(clean.map(c => c.id));
+      let fallback = clean.find(c => c.id === "diger");
+      const orphans = S.items.filter(i => !ids.has(i.cat));
+      if (orphans.length && !fallback) { fallback = { id: "diger", emoji: "📦", name: "Diğer", kw: "" }; clean.push(fallback); }
+      S.cats = clean; closeSheet();
+      try {
+        await saveCats();
+        for (const o of orphans) await saveItem({ ...o, cat: fallback.id });
+        toast("Kategoriler kaydedildi");
+      } catch { toast("Kaydedilemedi"); }
+    };
+  };
+  draw();
+}
+
+/* ---------- Yedek ---------- */
+$("#btnExport").onclick = async () => {
+  const data = JSON.stringify({ app: "SonraBak", v: VERSION, author: "Mehmet Karadeniz, 2026-2027", cats: S.cats, items: S.items });
+  try {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+    a.download = "sonrabak-yedek-" + new Date().toISOString().slice(0, 10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    toast(`${S.items.length} kayıt indirildi`); return;
+  } catch {}
+  try { await navigator.clipboard.writeText(data); toast(`${S.items.length} kayıt panoya kopyalandı`); }
+  catch {
+    openSheet(`<h3>Yedek</h3><p style="color:var(--muted);font-size:13px">Aşağıdaki metni seçip kopyala ve bir yere kaydet.</p><textarea class="field" style="width:100%" rows="8" readonly>${esc(data)}</textarea>`);
+  }
+};
+$("#btnImport").onclick = () => {
+  openSheet(`<h3>Yedek yükle</h3>
+    <p style="color:var(--muted);font-size:13px">Yedek metnini yapıştır veya .json dosyası seç. Mevcut kayıtlar silinmez, eklenir.</p>
+    <textarea class="field" id="impT" style="width:100%" rows="6" placeholder='{"app":"SonraBak",…}'></textarea>
+    <input type="file" id="impF" accept=".json,.txt,application/json" style="margin:8px 0">
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="iX">Vazgeç</button><button class="btn pri" id="iS">Yükle</button></div>`);
+  $("#impF").onchange = async e => { const f = e.target.files[0]; if (f) $("#impT").value = await f.text(); };
+  $("#iX").onclick = closeSheet;
+  $("#iS").onclick = async () => {
+    let d; try { d = JSON.parse($("#impT").value); } catch { toast("Geçersiz yedek"); return; }
+    if (!d || !Array.isArray(d.items)) { toast("Geçersiz yedek"); return; }
+    closeSheet();
+    if (Array.isArray(d.cats)) {
+      for (const c of d.cats) if (c && c.id && !S.cats.some(x => x.id === c.id)) S.cats.push({ id: String(c.id), emoji: String(c.emoji || "📁"), name: String(c.name || "Adsız"), kw: String(c.kw || "") });
+      await saveCats();
+    }
+    const have = new Set(S.items.map(i => i.id)); let n = 0;
+    for (const it of d.items) {
+      if (!it || !it.id || have.has(it.id)) continue;
+      const clean = { id: String(it.id), url: String(it.url || ""), title: String(it.title || ""), note: String(it.note || ""), platform: platformOf(it.url || "").k, cat: String(it.cat || "diger"), auto: !!it.auto, read: !!it.read, fav: !!it.fav, created: +it.created || Date.now() };
+      try { await saveItem(clean); n++; } catch {}
+    }
+    toast(n + " kayıt yüklendi");
+  };
+};
+
+/* ---------- Paylaş menüsünden gelen içerik (share_target) ---------- */
+function handleShared() {
+  const p = new URLSearchParams(location.search);
+  const parts = [p.get("url"), p.get("text"), p.get("title")].filter(Boolean);
+  if (!parts.length) return;
+  const url = extractUrl(parts.join(" "));
+  const text = [p.get("title"), p.get("text")].filter(Boolean).join("\n").replace(url, "").trim();
+  $("#inUrl").value = (url ? url + (text ? "\n" + text : "") : text);
+  history.replaceState(null, "", location.pathname);
+  setTimeout(() => $("#btnSave").click(), 300);
+}
+
+/* ---------- Service worker ---------- */
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+/* ---------- Başlat ---------- */
+render();
+initCloud();
+initSample();
+handleShared();
+})();
+</script>
+</body>
+</html>
