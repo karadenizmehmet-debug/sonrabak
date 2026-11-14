@@ -117,7 +117,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 </head>
 <body>
 <header>
-  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.5.2</span></div>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.5.3</span></div>
   <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
   <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
   <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
@@ -159,6 +159,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
   <div class="row" style="justify-content:center;margin-top:10px;gap:14px">
     <button class="lnk" id="btnExport">Yedek indir</button>
     <button class="lnk" id="btnImport">Yedek yükle</button>
+    <button class="lnk" id="btnDedup" style="display:none"></button>
   </div>
   <footer>© Mehmet Karadeniz, 2026-2027</footer>
 </main>
@@ -168,7 +169,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
 <script>
 (() => {
-const VERSION = "1.5.2";
+const VERSION = "1.5.3";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -220,6 +221,18 @@ function extractUrl(text) {
   const m = String(text || "").match(/https?:\/\/[^\s<>"']+/i);
   return m ? m[0].replace(/[),.;!?]+$/, "") : "";
 }
+// Aynı içeriğin farklı paylaşım linklerini eşitle (utm, igsh, si… at; www/m. at; sondaki / at)
+function normUrl(u) {
+  try {
+    const x = new URL(u);
+    x.hash = "";
+    x.hostname = x.hostname.replace(/^(www|m|mobile)\./, "");
+    if (x.hostname === "youtu.be") { const id = x.pathname.slice(1); x.hostname = "youtube.com"; x.pathname = "/watch"; x.search = "?v=" + id; }
+    for (const k of [...x.searchParams.keys()]) if (/^(utm_|igsh|igshid|si$|fbclid|gclid|ref$|ref_src|feature$|s$|t$|share)/i.test(k)) x.searchParams.delete(k);
+    return (x.hostname + x.pathname.replace(/\/+$/, "") + (x.searchParams.toString() ? "?" + x.searchParams.toString() : "")).toLowerCase();
+  } catch { return String(u || "").trim().toLowerCase(); }
+}
+const findDup = url => url ? S.items.find(i => i.url && normUrl(i.url) === normUrl(url)) : null;
 function domainOf(url) {
   try { return new URL(url).hostname.replace(/^www\.|^m\./, ""); } catch { return ""; }
 }
@@ -804,6 +817,12 @@ $("#btnSave").onclick = async () => {
   const btn = $("#btnSave"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
   try {
     const url = extractUrl(raw);
+    const dup = findDup(url);
+    if (dup) {
+      toast("Zaten kayıtlı: " + (dup.title || dup.url).slice(0, 60));
+      $("#inUrl").value = ""; S.q = ""; $("#q").value = ""; go(dup.cat); OPEN.add(dup.id); render();
+      return;
+    }
     const userTitle = $("#inTitle").value.trim();
     const it = {
       id: uid8(), url,
@@ -921,6 +940,9 @@ function render() {
     `<div class="empty"><div class="big">${S.items.length ? "🔎" : "📥"}</div>${
       S.items.length ? "Burada kayıt yok." : "Henüz kayıt yok.<br>Instagram, YouTube ya da bir sitede <b>Paylaş</b>'a bas,<br>listeden <b>Sonra Bak</b>'ı seç ya da linki kopyalayıp yukarıya yapıştır."}</div>`;
 
+  const dupN = dupGroups().reduce((n, g) => n + g.length - 1, 0);
+  $("#btnDedup").style.display = dupN ? "" : "none";
+  $("#btnDedup").textContent = "🧹 " + dupN + " tekrar eden kaydı temizle";
   const unread = S.items.filter(i => !i.read).length;
   $("#stat").textContent = S.items.length ? `${S.items.length} kayıt · ${unread} bakılmadı · ${S.cats.length} kategori` : "";
 }
@@ -1128,6 +1150,27 @@ async function deleteCat(id) {
   if (S.sel === id) go(c.parent || "home");
 }
 
+/* ---------- Tekrar eden kayıtlar ---------- */
+function dupGroups() {
+  const m = new Map();
+  for (const i of S.items) { if (!i.url) continue; const k = normUrl(i.url); m.set(k, [...(m.get(k) || []), i]); }
+  return [...m.values()].filter(g => g.length > 1);
+}
+$("#btnDedup").onclick = () => {
+  const groups = dupGroups(); const n = groups.reduce((a, g) => a + g.length - 1, 0);
+  openConfirm(n + " tekrar eden kayıt silinsin mi? Her linkten en dolu olanı kalır.", async () => {
+    for (const g of groups) {
+      // en çok bilgisi olanı tut (yapay zekâ, etiket, not), okundu/yıldız bilgisini birleştir
+      const score = i => (i.ai ? 4 : 0) + ((i.tags || []).length ? 2 : 0) + (i.note ? 1 : 0) + (i.auto ? 0 : 1);
+      const keep = [...g].sort((a, b) => score(b) - score(a) || a.created - b.created)[0];
+      const merged = { ...keep, read: g.some(i => i.read), fav: g.some(i => i.fav), created: Math.min(...g.map(i => i.created || Date.now())) };
+      await saveItem(merged);
+      for (const i of g) if (i.id !== keep.id) await removeItem(i.id);
+    }
+    toast(n + " tekrar silindi");
+  });
+};
+
 /* ---------- Yedek ---------- */
 $("#btnExport").onclick = async () => {
   const data = JSON.stringify({ app: "SonraBak", v: VERSION, author: "Mehmet Karadeniz, 2026-2027", cats: S.cats, items: S.items });
@@ -1177,8 +1220,13 @@ function handleShared() {
   if (!parts.length) return;
   const url = extractUrl(parts.join(" "));
   const text = [p.get("title"), p.get("text")].filter(Boolean).join("\n").replace(url, "").trim();
-  $("#inUrl").value = (url ? url + (text ? "\n" + text : "") : text);
   history.replaceState(null, "", location.pathname);
+  // Uygulamaya geri dönünce Android aynı paylaşım adresini yeniden açabiliyor: aynı paylaşımı bir kez işle
+  const key = normUrl(url || text);
+  const done = LS.get("shareDone", []);
+  if (done.includes(key) || findDup(url)) return;
+  LS.set("shareDone", [key, ...done].slice(0, 50));
+  $("#inUrl").value = (url ? url + (text ? "\n" + text : "") : text);
   setTimeout(() => $("#btnSave").click(), 300);
 }
 
