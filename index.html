@@ -111,7 +111,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 </head>
 <body>
 <header>
-  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.4.2</span></div>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.4.3</span></div>
   <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
   <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
   <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
@@ -162,7 +162,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
 <script>
 (() => {
-const VERSION = "1.4.2";
+const VERSION = "1.4.3";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -276,6 +276,22 @@ function fixCats(list) {
 }
 
 /* ---------- Kural tabanlı kategori ---------- */
+// Yalnızca bir kategorinin alt kategorileri arasında anahtar kelimeyle seç (bulamazsa null)
+function ruleWithin(item, parentId) {
+  const ids = descendantIds(parentId); ids.delete(parentId);
+  const hay = " " + fold([item.url, item.title, item.ozet, item.desc, item.note].join(" ")) + " ";
+  let best = null, bestScore = 0;
+  for (const c of S.cats) {
+    if (!ids.has(c.id)) continue;
+    let score = 0;
+    for (const k of (c.kw || "").split(",").map(x => fold(x.trim()).trim()).filter(Boolean))
+      if (k.length <= 3 ? hay.includes(" " + k + " ") : hay.includes(" " + k)) score += k.length > 4 ? 2 : 1;
+    const nm = fold(c.name).trim();
+    if (nm.length > 2 && hay.includes(" " + nm)) score += 2;
+    if (score > bestScore) { bestScore = score; best = c.id; }
+  }
+  return best;
+}
 function ruleCategory(item) {
   const hay = " " + fold([item.url, item.title, item.ozet, item.desc, item.note].join(" ")) + " ";
   let best = null, bestScore = 0;
@@ -626,9 +642,9 @@ Yalnızca şu JSON'u döndür, başka hiçbir şey yazma:
 Kurallar:
 - "yol" kökten başlayan kategori adları listesidir, en fazla 2 seviye. Mevcut bir kategoriyi seçiyorsan adını AYNEN yaz.
 - Kategoriyi başlıktaki tek tek kelimelere göre DEĞİL, içeriğin GERÇEK KONUSUNA göre seç (sayfa içeriğine bak). Köşeli parantezdeki örnek kelimeler yalnızca ipucudur; kelime benzerliğine aldanma (ör. "clipboard" kelimesi "Etkileşimli Tahta" demek değildir; Windows pano programı → Yazılım & Teknoloji).
-- İçeriğe uyan en özel kategoriyi seç: uygun bir alt kategori varsa onu seç (ör. ["Okul","Pardus"]).
+- İçeriğe uyan en özel kategoriyi seç. Seçtiğin üst kategorinin alt kategorileri varsa "yol" MUTLAKA 2 seviye olsun: uygun alt kategoriyi seç (ör. ["Okul","Pardus"], yapay zekâ ile ilgili bir araç → ["Yazılım & Teknoloji","Yapay Zekâ"]).
 ${allowNew
-? `- Uygun alt kategori yoksa ama içerik belirgin bir alt konuya aitse, mevcut üst kategorinin altına YENİ bir alt kategori adı yaz (ör. ["Okul","EBA"]).
+? `- Üst kategori uygun ama altındakilerden hiçbiri uymuyorsa, o üst kategorinin altına YENİ bir alt kategori adı yaz (ör. ["Okul","EBA"], ["Yazılım & Teknoloji","Otomasyon"]). Yalnızca tek seviyeli yol ancak içerik gerçekten genel ise kabul edilir.
 - Hiçbir üst kategori uymuyorsa YENİ bir üst kategori yaz, gerekirse altına bir alt kategori ekle (ör. ["Bahçe","Fide"]).
 - Yeni adlar 1-3 kelimelik, Türkçe, baş harfleri büyük olsun. "Diğer"i yalnızca gerçekten hiçbir şey çıkarılamıyorsa seç.
 - "emoji": yeni açılan en son kategori için uygun tek emoji.`
@@ -654,8 +670,9 @@ function resolvePath(names, emoji, allowNew) {
   const clean = (Array.isArray(names) ? names : [names]).map(n => String(n || "").trim()).filter(Boolean).slice(0, 2);
   for (let i = 0; i < clean.length; i++) {
     const nm = clean[i];
-    let c = childrenOf(parent).find(x => trLower(x.name) === trLower(nm));
-    if (!c && parent === null) c = S.cats.find(x => trLower(x.name) === trLower(nm) && i === clean.length - 1); // tek ad verildiyse her yerde ara
+    const same = x => fold(x.name).trim() === fold(nm).trim();
+    let c = childrenOf(parent).find(same);
+    if (!c && parent === null && i === clean.length - 1) c = S.cats.find(same); // tek ad verildiyse her yerde ara
     if (!c) {
       if (!allowNew) break;
       c = { id: "c" + uid8(), emoji: i === clean.length - 1 ? (String(emoji || "📁").slice(0, 4) || "📁") : "📁", name: nm.slice(0, 30), parent, kw: "" };
@@ -691,7 +708,10 @@ async function enrich(it, { recat = false, userTitle = "", userText = "" } = {})
       if (recat && (ai.yol || ai.kategori)) {
         const useSample = sample && AI.provider === "off";
         const r = resolvePath(ai.yol || [ai.kategori], ai.emoji, useSample || AI.newCats !== false);
-        if (r.id) { it.cat = r.id; it.auto = true; }
+        if (r.id) {
+          it.cat = r.id; it.auto = true;
+          if (childrenOf(r.id).length) { const sub = ruleWithin(it, r.id); if (sub) it.cat = sub; }
+        }
         if (r.created.length) { await saveCats(); catMsg = " · yeni: " + r.created.map(c => c.name).join(" › "); }
       }
     }
