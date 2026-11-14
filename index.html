@@ -78,6 +78,8 @@ main{max-width:720px;margin:0 auto;padding:12px 14px 110px}
 .body{flex:1;min-width:0}
 .t{font-weight:650;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:inherit;text-decoration:none}
 .meta{color:var(--muted);font-size:12.5px;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tur{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--acc);margin-bottom:2px}
+.sum.ai{color:var(--ink);opacity:.85}
 .sum{font-size:13px;color:var(--muted);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .note{font-size:13.5px;margin-top:5px;background:var(--bg);border-radius:8px;padding:6px 8px;white-space:pre-wrap;word-break:break-word}
 .chipb{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);font-weight:600}
@@ -109,7 +111,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 </head>
 <body>
 <header>
-  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.3</span></div>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.4</span></div>
   <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
   <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
   <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
@@ -160,13 +162,13 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
 <script>
 (() => {
-const VERSION = "1.3";
+const VERSION = "1.4";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const trLower = s => String(s || "").toLocaleLowerCase("tr");
 // Türkçe karakterleri sadeleştir: "akıllı-tahta" ile "akilli tahta" eşleşsin
-const fold = s => trLower(s).replace(/[ıİ]/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c").replace(/[â]/g, "a").replace(/[-_+\/.]+/g, " ").replace(/\s+/g, " ");
+const fold = s => trLower(s).replace(/[ıİ]/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c").replace(/[â]/g, "a").replace(/[-_+\/.'’"“”()\[\]:;,!?#]+/g, " ").replace(/\s+/g, " ");
 
 /* ---------- Varsayılan kategoriler (parent = üst kategori id) ---------- */
 const DEFAULT_CATS = [
@@ -275,14 +277,15 @@ function fixCats(list) {
 
 /* ---------- Kural tabanlı kategori ---------- */
 function ruleCategory(item) {
-  const hay = " " + fold([item.url, item.title, item.note].join(" ")) + " ";
+  const hay = " " + fold([item.url, item.title, item.ozet, item.desc, item.note].join(" ")) + " ";
   let best = null, bestScore = 0;
   for (const c of S.cats) {
     const kws = (c.kw || "").split(",").map(s => fold(s.trim()).trim()).filter(Boolean);
     let score = 0;
-    for (const k of kws) if (k.length <= 3 ? hay.includes(" " + k + " ") : hay.includes(k)) score += k.length > 4 ? 2 : 1; // kısa kelimeler tam kelime olarak eşleşsin
+    // kelime BAŞINDAN eşleşsin: "tahta" → "tahtada" olur ama "board" → "clipboard" olmaz; kısa kelimeler tam kelime
+    for (const k of kws) if (k.length <= 3 ? hay.includes(" " + k + " ") : hay.includes(" " + k)) score += k.length > 4 ? 2 : 1;
     const nm = fold(c.name).trim();
-    if (nm.length > 2 && hay.includes(nm)) score += 2;
+    if (nm.length > 2 && hay.includes(" " + nm)) score += 2;
     if (score > 0) score += depthOf(c.id) * 0.5; // daha özel (alt) kategori öne geçsin
     if (score > bestScore) { bestScore = score; best = c.id; }
   }
@@ -420,8 +423,9 @@ $("#aiWrap").onclick = () => {
         <div id="aHelp" style="font-size:12.5px;color:var(--muted)"></div>
       </div>
       <div id="aRes" style="font-size:13px"></div>
-      ${(() => { const n = S.items.filter(i => i.url && isGenericTitle(i.title, i.url)).length;
-        return n ? `<button class="btn sm" id="aFix">✨ Adres görünen ${n} kaydın başlığını düzelt</button>` : ""; })()}
+      ${lastAiError ? `<div style="font-size:12.5px;color:var(--acc)">Son hata: ${esc(lastAiError.slice(0, 160))}</div>` : ""}
+      ${(() => { const n = S.items.filter(needsAI).length;
+        return n ? `<button class="btn sm" id="aFix">✨ ${n} kaydı yapay zekâyla düzenle (Türkçe başlık, özet, kategori)</button>` : ""; })()}
       <div class="row" style="justify-content:flex-end">
         <button class="btn" id="aT">Dene</button><button class="btn pri" id="aS">Kaydet</button>
       </div>
@@ -450,7 +454,7 @@ $("#aiWrap").onclick = () => {
       $("#aRes").innerHTML = r && r.tamam ? '<span style="color:var(--ok)">✔ Çalışıyor</span>' : "Cevap geldi ama beklenen biçimde değil.";
     } catch (e) { $("#aRes").innerHTML = '<span style="color:var(--acc)">✖ ' + esc(e.message || "Hata") + "</span>"; }
   };
-  if ($("#aFix")) $("#aFix").onclick = () => { AI = read(); LS.set("aiConf", AI); refreshAiState(); const b = $("#aFix"); b.disabled = true; fixGenericTitles(b); };
+  if ($("#aFix")) $("#aFix").onclick = () => { AI = read(); LS.set("aiConf", AI); refreshAiState(); const b = $("#aFix"); if (AI.provider === "off" && !sample) { toast("Önce bir sağlayıcı seç"); return; } b.disabled = true; reprocessAll(b); };
   $("#aS").onclick = () => {
     AI = read(); LS.set("aiConf", AI); refreshAiState(); closeSheet();
     toast(AI.provider === "off" ? "Akıllı kategori kapalı" : "Akıllı kategori açık");
@@ -520,6 +524,17 @@ async function fetchMeta(url) {
   if (d && (d.title || d.description)) return { title: String(d.title || ""), desc: String(d.description || "").slice(0, 400), author: String(d.author || d.publisher || "") };
   return null;
 }
+// Sayfanın düz metni: yapay zekâ başlığa değil içeriğe baksın diye (r.jina.ai, ücretsiz okuyucu)
+async function fetchPageText(url) {
+  if (!url || /(youtube\.com|youtu\.be)/i.test(url)) return "";
+  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 10000);
+  try {
+    const r = await fetch("https://r.jina.ai/" + url, { signal: ctl.signal, headers: { "x-return-format": "text" } });
+    if (!r.ok) return "";
+    return (await r.text()).replace(/\s+/g, " ").trim().slice(0, 3500);
+  } catch { return ""; } finally { clearTimeout(to); }
+}
+let lastAiError = "";
 // Başlık sadece adres ya da "Instagram gönderisi" gibi genel bir şeyse true
 function isGenericTitle(title, url) {
   const t = String(title || "").trim();
@@ -534,28 +549,31 @@ function isGenericTitle(title, url) {
 const hasAI = () => (sample && AI.provider === "off") || (AI.provider !== "off" && !!AI.key);
 
 /* ---------- Akıllı kategori ---------- */
-async function aiCategorize(item, meta = null, { titleOnly = false } = {}) {
+async function aiCategorize(item, meta = null, { titleOnly = false, pageText = "" } = {}) {
   const useSample = sample && AI.provider === "off";
   if (!useSample && (AI.provider === "off" || !AI.key)) return null;
-  const web = !useSample && AI.provider === "gemini" && /^https?:\/\//i.test(item.url || "");
+  const web = !pageText && !useSample && AI.provider === "gemini" && /^https?:\/\//i.test(item.url || "");
   const info = `URL: ${item.url || "-"}
 Kullanıcının yazdığı başlık/metin: ${item.title || "-"}
 Not: ${item.note || "-"}
 Sayfanın kendi başlığı: ${meta?.title || "-"}
 Sayfa açıklaması: ${meta?.desc || "-"}
-Yazar/hesap: ${meta?.author || "-"}`;
-  const titleRules = `- "baslik": İçeriğin NE HAKKINDA olduğunu anlatan 3-8 kelimelik Türkçe başlık (ör. "Pardus'ta yazıcı kurulumu", "Fırında karnıyarık tarifi", "Etkileşimli tahtada ekran kaydı"). ASLA adres, alan adı, kullanıcı adı ya da "Instagram gönderisi", "YouTube videosu" gibi genel ifade yazma. Bilgi azsa en makul tahmini yaz.
-- "ozet": İçeriği anlatan tek cümle, en fazla 20 kelime, Türkçe. Bilgi yoksa boş bırak.`;
+Yazar/hesap: ${meta?.author || "-"}
+Sayfa içeriğinden bölüm: ${pageText ? pageText : "-"}`;
+  const titleRules = `- HER ŞEYİ TÜRKÇE YAZ. İçerik İngilizce ya da başka dildeyse Türkçeye çevirerek anlat; özel adları (program, marka, kişi) olduğu gibi bırak.
+- "baslik": İçeriğin NE OLDUĞUNU ilk bakışta anlatan 3-8 kelimelik Türkçe başlık (ör. "Ditto – Windows için pano geçmişi programı", "Pardus'ta yazıcı kurulumu", "Fırında karnıyarık tarifi"). ASLA adres, alan adı, kullanıcı adı ya da "Instagram gönderisi", "YouTube videosu" gibi genel ifade yazma. Bilgi azsa en makul tahmini yaz.
+- "ozet": Ne işe yaradığını / ne anlattığını söyleyen tek Türkçe cümle, en fazla 20 kelime.
+- "tur": İçeriğin türü, 1-2 kelime Türkçe (ör. Program, Uygulama, Tarif, Video ders, Makale, Haber, Ürün, Kod deposu, İpucu, Etkinlik).`;
   if (titleOnly) {
     const p2 = `Bir "sonra bak" uygulamasında kaydedilen içeriğe anlaşılır bir Türkçe başlık yazıyorsun.${web ? " Linkteki sayfayı açıp okuyabiliyorsan oku; açamıyorsan aşağıdaki bilgiye bak." : " İnternete erişimin yok; yalnızca aşağıdaki bilgiye bak."}
 
 ${info}
 
 Yalnızca şu JSON'u döndür, başka hiçbir şey yazma:
-{"baslik":"<başlık>","ozet":"<tek cümle>"}
+{"baslik":"<başlık>","ozet":"<tek cümle>","tur":"<tür>"}
 ${titleRules}`;
-    try { return useSample ? await sample.json(p2, { modelTier: "quick" }) : await callProvider(AI, p2, { web }); }
-    catch (e) { return null; }
+    try { lastAiError = ""; return useSample ? await sample.json(p2, { modelTier: "quick" }) : await callProvider(AI, p2, { web }); }
+    catch (e) { lastAiError = e?.message || "hata"; return null; }
   }
   const allowNew = useSample || AI.newCats !== false;
   const tree = treeOrder().map(({ c }) => "- " + ancestors(c.id).map(a => a.name).join(" > ") + (c.kw ? "  [" + c.kw.split(",").slice(0, 6).join(", ") + "]" : "")).join("\n");
@@ -569,10 +587,11 @@ ${tree}
 ${info}
 
 Yalnızca şu JSON'u döndür, başka hiçbir şey yazma:
-{"yol":["<üst kategori adı>","<alt kategori adı>"],"emoji":"<tek emoji>","baslik":"<başlık>","ozet":"<tek cümle>"}
+{"yol":["<üst kategori adı>","<alt kategori adı>"],"emoji":"<tek emoji>","baslik":"<başlık>","ozet":"<tek cümle>","tur":"<tür>"}
 
 Kurallar:
 - "yol" kökten başlayan kategori adları listesidir, en fazla 2 seviye. Mevcut bir kategoriyi seçiyorsan adını AYNEN yaz.
+- Kategoriyi başlıktaki tek tek kelimelere göre DEĞİL, içeriğin GERÇEK KONUSUNA göre seç (sayfa içeriğine bak). Köşeli parantezdeki örnek kelimeler yalnızca ipucudur; kelime benzerliğine aldanma (ör. "clipboard" kelimesi "Etkileşimli Tahta" demek değildir; Windows pano programı → Yazılım & Teknoloji).
 - İçeriğe uyan en özel kategoriyi seç: uygun bir alt kategori varsa onu seç (ör. ["Okul","Pardus"]).
 ${allowNew
 ? `- Uygun alt kategori yoksa ama içerik belirgin bir alt konuya aitse, mevcut üst kategorinin altına YENİ bir alt kategori adı yaz (ör. ["Okul","EBA"]).
@@ -586,10 +605,11 @@ ${titleRules}`;
       const r = await sample.json(prompt, { modelTier: "quick" });
       return r && typeof r === "object" ? r : null;
     }
+    lastAiError = "";
     return await callProvider(AI, prompt, { web });
   } catch (e) {
+    lastAiError = e?.message || e?.code || "hata";
     if (e && e.code === "not_granted") { sample = null; refreshAiState(); }
-    else if (!useSample) toast("Yapay zekâ cevap vermedi, anahtar kelime kullanıldı");
     return null;
   }
 }
@@ -614,31 +634,61 @@ function resolvePath(names, emoji, allowNew) {
   return { id, created };
 }
 
+/* ---------- Kaydı zenginleştir: sayfa bilgisi + içerik + yapay zekâ ---------- */
+// recat: kategoriyi de yapay zekâ seçsin mi · userTitle: kullanıcı başlık yazdıysa dokunma
+async function enrich(it, { recat = false, userTitle = "", userText = "" } = {}) {
+  const url = it.url;
+  const meta = url ? await fetchMeta(url) : null;
+  if (meta) {
+    if (!userTitle && meta.title && !isGenericTitle(meta.title, url) && (!it.ai || isGenericTitle(it.title, url))) it.title = meta.title.slice(0, 160);
+    if (meta.desc) it.desc = meta.desc;
+    if (meta.author) it.author = meta.author;
+  }
+  let catMsg = "", aiOk = false;
+  if (hasAI()) {
+    const pageText = url ? await fetchPageText(url) : "";
+    const base = { ...it, title: userText || (isGenericTitle(it.title, url) ? "" : it.title) };
+    const ai = await aiCategorize(base, meta, { titleOnly: !recat, pageText });
+    if (ai) {
+      aiOk = true; it.ai = true;
+      if (!userTitle && ai.baslik && String(ai.baslik).length > 3 && !isGenericTitle(ai.baslik, url)) it.title = String(ai.baslik).slice(0, 160);
+      if (ai.ozet) it.ozet = String(ai.ozet).slice(0, 200);
+      if (ai.tur) it.tur = String(ai.tur).slice(0, 24);
+      if (recat && (ai.yol || ai.kategori)) {
+        const useSample = sample && AI.provider === "off";
+        const r = resolvePath(ai.yol || [ai.kategori], ai.emoji, useSample || AI.newCats !== false);
+        if (r.id) { it.cat = r.id; it.auto = true; }
+        if (r.created.length) { await saveCats(); catMsg = " · yeni: " + r.created.map(c => c.name).join(" › "); }
+      }
+    }
+  }
+  if (recat && !aiOk) { it.cat = ruleCategory(it); it.auto = true; }
+  return { it, catMsg, aiOk };
+}
+
 /* ---------- Başlık önerisi (mevcut kayıtlar için) ---------- */
 async function suggestTitle(it) {
-  const meta = await fetchMeta(it.url);
-  let title = meta && meta.title && !isGenericTitle(meta.title, it.url) ? meta.title : "";
-  let ozet = "";
-  if (hasAI()) {
-    const t = await aiCategorize({ ...it, title: isGenericTitle(it.title, it.url) ? "" : it.title }, meta, { titleOnly: true });
-    if (t && t.baslik && !isGenericTitle(t.baslik, it.url)) title = String(t.baslik);
-    if (t && t.ozet) ozet = String(t.ozet);
-  }
-  return title ? { title: title.slice(0, 160), ozet: ozet.slice(0, 200), desc: meta?.desc || "" } : null;
+  const copy = { ...it };
+  const { aiOk } = await enrich(copy, { recat: false });
+  return !isGenericTitle(copy.title, copy.url) || aiOk ? { title: copy.title, ozet: copy.ozet || "", desc: copy.desc || "", tur: copy.tur || "" } : null;
 }
-async function fixGenericTitles(btn) {
-  const list = S.items.filter(i => i.url && isGenericTitle(i.title, i.url));
-  if (!list.length) { toast("Düzeltilecek başlık yok"); return; }
+const needsAI = i => !i.ai && (i.url || i.note);
+async function reprocessAll(btn) {
+  const list = S.items.filter(needsAI);
+  if (!list.length) { toast("Düzenlenecek kayıt yok"); return; }
   let ok = 0;
   for (let k = 0; k < list.length; k++) {
-    if (btn) btn.textContent = `Düzeltiliyor ${k + 1}/${list.length}…`;
-    const it = S.items.find(x => x.id === list[k].id) || list[k];
-    const r = await suggestTitle(it);
-    if (r) { try { await saveItem({ ...it, title: r.title, ozet: r.ozet || it.ozet || "", desc: r.desc || it.desc || "" }); ok++; } catch {} }
-    await new Promise(res => setTimeout(res, 1500)); // dakikalık kotaya takılmamak için
+    if (btn) btn.textContent = `Düzenleniyor ${k + 1}/${list.length}…`;
+    const cur = S.items.find(x => x.id === list[k].id); if (!cur) continue;
+    const copy = { ...cur };
+    // elle seçilmiş kategoriye dokunma, yalnızca otomatik olanları yeniden kategorile
+    const { aiOk } = await enrich(copy, { recat: !!cur.auto });
+    if (aiOk) { try { await saveItem(copy); ok++; } catch {} }
+    else if (lastAiError && /quota|exhausted|429/i.test(lastAiError)) { toast("Kota doldu, kalanlar sonra yapılabilir"); break; }
+    await new Promise(res => setTimeout(res, 2500)); // dakikalık kotaya takılmamak için
   }
   if (btn) btn.textContent = "Bitti";
-  toast(`${ok}/${list.length} başlık düzeltildi`);
+  toast(`${ok}/${list.length} kayıt düzenlendi`);
 }
 
 /* ---------- Düzeltmelerden öğren ---------- */
@@ -674,37 +724,13 @@ $("#btnSave").onclick = async () => {
       cat: $("#inCat").value, auto: false, read: false, fav: false, created: Date.now()
     };
     if (!url) it.note = it.note || (raw.length > 140 ? raw : "");
-    const meta = url && !userTitle ? await fetchMeta(url) : null;
-    if (meta) {
-      if (meta.title && !isGenericTitle(meta.title, url)) it.title = meta.title.slice(0, 160);
-      if (meta.desc) it.desc = meta.desc;
-      if (meta.author) it.author = meta.author;
-    }
-    let catMsg = "";
     const userText = userTitle || raw.replace(url, "").trim();
-    if (it.cat !== "__auto" && !userTitle && hasAI()) {
-      // kategori elle seçildi: yapay zekâ yalnızca başlık yazsın
-      const t = await aiCategorize({ ...it, title: userText || it.title }, meta, { titleOnly: true });
-      if (t && t.baslik && String(t.baslik).length > 3) it.title = String(t.baslik).slice(0, 160);
-      if (t && t.ozet) it.ozet = String(t.ozet).slice(0, 200);
-    }
-    if (it.cat === "__auto") {
-      it.auto = true;
-      const useSample = sample && AI.provider === "off";
-      const ai = await aiCategorize({ ...it, title: userText || it.title }, meta);
-      let picked = null;
-      if (ai && (ai.yol || ai.kategori)) {
-        const r = resolvePath(ai.yol || [ai.kategori], ai.emoji, useSample || AI.newCats !== false);
-        picked = r.id;
-        if (r.created.length) { await saveCats(); catMsg = " · yeni: " + r.created.map(c => c.name).join(" › "); }
-      }
-      it.cat = picked || ruleCategory(it);
-      if (ai && ai.baslik && !userTitle && String(ai.baslik).length > 3 && !isGenericTitle(ai.baslik, url)) it.title = String(ai.baslik).slice(0, 160);
-      if (ai && ai.ozet) it.ozet = String(ai.ozet).slice(0, 200);
-    }
+    const auto = it.cat === "__auto";
+    if (auto) it.cat = "diger";
+    const { catMsg, aiOk } = await enrich(it, { recat: auto, userTitle, userText });
     await saveItem(it);
     const c = catById(it.cat);
-    toast(`${c.emoji} ${pathName(it.cat)} içine kaydedildi${catMsg}`);
+    toast(`${c.emoji} ${pathName(it.cat)} içine kaydedildi${catMsg}` + (hasAI() && !aiOk ? " · ⚠️ yapay zekâ cevap vermedi: " + lastAiError.slice(0, 60) : ""));
     $("#inUrl").value = ""; $("#inTitle").value = ""; $("#inNote").value = ""; $("#more").classList.remove("open");
   } catch (e) {
     toast(e && e.code === "quota_exceeded" ? "Depolama dolu, eski kayıtları sil" : "Kaydedilemedi, tekrar dene");
@@ -790,7 +816,7 @@ function render() {
   if (S.filter === "fav") arr = arr.filter(i => i.fav);
   if (S.q) {
     const words = fold(S.q).split(/\s+/).filter(Boolean);
-    arr = S.items.filter(i => { const h = fold([i.title, i.ozet, i.desc, i.author, i.note, i.url, pathName(i.cat), pByKey(i.platform).label].join(" ")); return words.every(w => h.includes(w)); });
+    arr = S.items.filter(i => { const h = fold([i.title, i.tur, i.ozet, i.desc, i.author, i.note, i.url, pathName(i.cat), pByKey(i.platform).label].join(" ")); return words.every(w => h.includes(w)); });
   }
   const showHome = S.sel === "home" && !S.q;
   if (showHome) arr = arr.slice(0, 15);
@@ -817,12 +843,13 @@ function itemHTML(i) {
   return `<div class="item ${i.read ? "read" : ""}" data-id="${esc(i.id)}">
     <div class="pf" style="background:${p.bg}">${p.ic}</div>
     <div class="body">
+      ${i.tur ? `<div class="tur">${esc(i.tur)}</div>` : ""}
       ${titleEl}
       <div class="meta">
         <button class="chipb" data-act="cat">${esc(c.emoji)} ${esc(pathName(i.cat))}${i.auto ? " 🤖" : ""}</button>
         <span>${esc(safeUrl ? domainOf(safeUrl) : p.label)}</span><span>·</span><span>${fmtDate(i.created)}</span>
       </div>
-      ${i.ozet || i.desc ? `<div class="sum">${esc(i.ozet || String(i.desc).slice(0, 160))}</div>` : ""}
+      ${i.ozet ? `<div class="sum ai">${esc(i.ozet)}</div>` : i.desc ? `<div class="sum">${esc(String(i.desc).slice(0, 160))}</div>` : ""}
       ${i.note ? `<div class="note">${esc(i.note)}</div>` : ""}
       <div class="acts">
         <button class="ib" data-act="read" title="Baktım">${i.read ? "↩️" : "✅"}</button>
@@ -911,7 +938,7 @@ function openEdit(it) {
     const b = $("#eAI"); b.disabled = true; b.innerHTML = '<span class="spin"></span>';
     const r = await suggestTitle({ ...it, url: $("#eU").value.trim() });
     b.disabled = false; b.textContent = "✨";
-    if (r) { $("#eT").value = r.title; it.ozet = r.ozet || it.ozet; it.desc = r.desc || it.desc; }
+    if (r) { $("#eT").value = r.title; it.ozet = r.ozet || it.ozet; it.desc = r.desc || it.desc; it.tur = r.tur || it.tur; it.ai = true; }
     else toast(hasAI() ? "Başlık bulunamadı" : "Sayfa başlığı alınamadı · akıllı kategoriyi açarsan yapay zekâ yazar");
   };
   $("#eS").onclick = async () => {
