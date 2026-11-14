@@ -49,17 +49,23 @@ main{max-width:720px;margin:0 auto;padding:12px 14px 110px}
 .search{margin:14px 0 10px;position:relative}
 .search input{width:100%;padding:11px 14px 11px 38px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);outline:none}
 .search::before{content:"🔍";position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;opacity:.6}
-.cats{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
-.cats::-webkit-scrollbar{display:none}
-.cat{flex:none;padding:7px 12px;border-radius:999px;background:var(--card);box-shadow:var(--shadow);font-weight:600;font-size:14px;white-space:nowrap}
-.cat b{font-weight:700;color:var(--muted);margin-left:4px;font-size:12px}
-.cat.on{background:var(--ink);color:var(--bg)}
-.cat.on b{color:var(--bg);opacity:.7}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px}
-.tile{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:12px;text-align:left;display:flex;flex-direction:column;gap:4px}
-.tile .e{font-size:24px}
-.tile .n{font-weight:700}
-.tile .c{color:var(--muted);font-size:13px}
+.clist{background:var(--card);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+.crow2{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;text-align:left;border-bottom:1px solid var(--line)}
+.crow2:last-child{border-bottom:0}
+.crow2:active{background:var(--chip)}
+.crow2 .e{font-size:22px;width:30px;text-align:center;flex:none}
+.crow2 .n{flex:1;min-width:0}
+.crow2 .n b{display:block;font-weight:650}
+.crow2 .n small{color:var(--muted);font-size:12.5px}
+.crow2 .cnt{color:var(--muted);font-weight:700;font-size:13px;background:var(--chip);border-radius:999px;padding:2px 9px}
+.crow2 .ch{color:var(--muted);font-size:18px}
+.crumb{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:2px 2px 10px;font-size:14px}
+.crumb button{color:var(--acc);font-weight:600;padding:2px 4px}
+.crumb span{color:var(--muted)}
+.chead{display:flex;align-items:center;gap:10px;margin:0 2px 12px}
+.chead .e{font-size:30px}
+.chead h1{font-size:22px;margin:0;flex:1;min-width:0;word-break:break-word}
+.tree .opt{padding:9px 10px}
 .sec{display:flex;justify-content:space-between;align-items:center;margin:6px 2px 8px}
 .sec h2{font-size:15px;margin:0;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .filters{display:flex;gap:6px}
@@ -102,7 +108,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 </head>
 <body>
 <header>
-  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.1</span></div>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.2</span></div>
   <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
   <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
   <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
@@ -128,9 +134,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
   <div class="search"><input id="q" type="search" placeholder="Kayıtlarda ara…"></div>
 
-  <div class="cats" id="catBar"></div>
-
-  <div id="home"></div>
+  <div id="nav"></div>
 
   <div class="sec">
     <h2 id="listTitle">Son kaydedilenler</h2>
@@ -155,24 +159,34 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
 <script>
 (() => {
-const VERSION = "1.1";
+const VERSION = "1.2";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const trLower = s => String(s || "").toLocaleLowerCase("tr");
+// Türkçe karakterleri sadeleştir: "akıllı-tahta" ile "akilli tahta" eşleşsin
+const fold = s => trLower(s).replace(/[ıİ]/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c").replace(/[â]/g, "a").replace(/[-_+\/.]+/g, " ").replace(/\s+/g, " ");
 
-/* ---------- Varsayılan kategoriler ---------- */
+/* ---------- Varsayılan kategoriler (parent = üst kategori id) ---------- */
 const DEFAULT_CATS = [
-  {id:"egitim",  emoji:"🎓", name:"Eğitim",          kw:"eğitim,ders,öğretmen,öğrenci,sınav,meb,okul,etkinlik,çalışma kağıdı,müfredat,maarif,lgs,yks,kpss,kurs,öğren"},
-  {id:"teknoloji",emoji:"💻", name:"Yazılım & Teknoloji", kw:"github,kod,yazılım,python,javascript,react,html,css,api,firebase,yapay zeka,ai,claude,chatgpt,android,apk,linux,programlama,uygulama,developer,stackoverflow"},
-  {id:"yemek",   emoji:"🍲", name:"Yemek & Tarif",    kw:"tarif,yemek,tatlı,çorba,mutfak,pasta,kek,börek,recipe,yemekleri,nasıl yapılır,lezzet"},
-  {id:"okuma",   emoji:"📖", name:"Makale & Okuma",   kw:"makale,blog,yazı,medium,substack,kitap,okuma,röportaj,inceleme,wikipedia"},
-  {id:"video",   emoji:"🎬", name:"Video",            kw:""},
-  {id:"saglik",  emoji:"💪", name:"Sağlık & Spor",    kw:"sağlık,spor,egzersiz,diyet,fitness,yürüyüş,koşu,beslenme,uyku,antrenman"},
-  {id:"alisveris",emoji:"🛒", name:"Alışveriş",       kw:"trendyol,hepsiburada,amazon,n11,ürün,fiyat,indirim,satın,sepet,kampanya,aliexpress,temu"},
-  {id:"haber",   emoji:"📰", name:"Haber",            kw:"haber,son dakika,gündem,hurriyet,sozcu,ntv,cnnturk,bbc,milliyet,sabah,aa.com.tr,habertürk"},
-  {id:"ilham",   emoji:"✨", name:"İlham & Fikir",    kw:"fikir,ilham,tasarım,design,dekorasyon,diy,kendin yap,pinterest,dribbble,behance"},
-  {id:"diger",   emoji:"📦", name:"Diğer",            kw:""}
+  {id:"okul",     emoji:"🏫", name:"Okul",               parent:null, kw:"okul,meb,eba,e-okul,mebbis,öğretmen,öğrenci,veli,müdür,nöbet,zümre"},
+  {id:"tahta",    emoji:"🖥️", name:"Etkileşimli Tahta",  parent:"okul", kw:"etkileşimli tahta,akıllı tahta,etahta,e-tahta,board,dokunmatik,tahta kilidi"},
+  {id:"pardus",   emoji:"🐧", name:"Pardus",             parent:"okul", kw:"pardus,etap,debian,linux,terminal,sudo,apt"},
+  {id:"egitim",   emoji:"📝", name:"Ders Materyali",     parent:"okul", kw:"eğitim,ders,etkinlik,çalışma kağıdı,föy,sınav,soru,test,müfredat,maarif,lgs,kazanım,ünite"},
+  {id:"teknoloji",emoji:"💻", name:"Yazılım & Teknoloji", parent:null, kw:"github,kod,yazılım,python,javascript,react,html,css,api,firebase,programlama,developer,stackoverflow"},
+  {id:"yz",       emoji:"🤖", name:"Yapay Zekâ",         parent:"teknoloji", kw:"yapay zeka,yapay zekâ,ai,claude,chatgpt,gemini,prompt,llm"},
+  {id:"uygulama", emoji:"📱", name:"Uygulamalar",        parent:"teknoloji", kw:"uygulama,app,apk,android,ios,play store"},
+  {id:"bakim",    emoji:"🔧", name:"Bakım & Tamir",      parent:null, kw:"bakım,tamir,onarım,arıza,değişimi,nasıl değiştirilir,kendin yap,diy"},
+  {id:"arac",     emoji:"🚗", name:"Araç Bakım",         parent:"bakim", kw:"araba,araç,otomobil,motor,yağ değişimi,lastik,fren,akü,egzoz,triger"},
+  {id:"ev",       emoji:"🏠", name:"Ev",                 parent:"bakim", kw:"tesisat,musluk,priz,boya,duvar,kombi,elektrik,sızıntı"},
+  {id:"yemek",    emoji:"🍲", name:"Yemek & Tarif",      parent:null, kw:"tarif,yemek,tatlı,çorba,mutfak,pasta,kek,börek,recipe,lezzet"},
+  {id:"okuma",    emoji:"📖", name:"Makale & Okuma",     parent:null, kw:"makale,blog,yazı,medium,substack,kitap,okuma,röportaj,inceleme,wikipedia"},
+  {id:"video",    emoji:"🎬", name:"Video",              parent:null, kw:""},
+  {id:"saglik",   emoji:"💪", name:"Sağlık & Spor",      parent:null, kw:"sağlık,spor,egzersiz,diyet,fitness,yürüyüş,koşu,beslenme,uyku,antrenman"},
+  {id:"alisveris",emoji:"🛒", name:"Alışveriş",          parent:null, kw:"trendyol,hepsiburada,amazon,n11,ürün,fiyat,indirim,satın,sepet,kampanya,aliexpress,temu"},
+  {id:"haber",    emoji:"📰", name:"Haber",              parent:null, kw:"haber,son dakika,gündem,hurriyet,sozcu,ntv,cnnturk,bbc,milliyet,sabah,aa.com.tr,habertürk"},
+  {id:"ilham",    emoji:"✨", name:"İlham & Fikir",      parent:null, kw:"fikir,ilham,tasarım,design,dekorasyon,pinterest,dribbble,behance"},
+  {id:"diger",    emoji:"📦", name:"Diğer",              parent:null, kw:""}
 ];
 
 /* ---------- Platform tespiti ---------- */
@@ -218,24 +232,6 @@ function guessTitle(url, text) {
   } catch { return text.slice(0, 140); }
 }
 
-/* ---------- Kural tabanlı kategori ---------- */
-function ruleCategory(item) {
-  const hay = trLower([item.url, item.title, item.note].join(" "));
-  let best = null, bestScore = 0;
-  for (const c of S.cats) {
-    const kws = (c.kw || "").split(",").map(s => trLower(s.trim())).filter(Boolean);
-    let score = 0;
-    for (const k of kws) if (hay.includes(k)) score += k.length > 4 ? 2 : 1;
-    if (trLower(c.name) && hay.includes(trLower(c.name))) score += 2;
-    if (score > bestScore) { bestScore = score; best = c.id; }
-  }
-  if (best) return best;
-  const p = platformOf(item.url);
-  if (p.cat && S.cats.some(c => c.id === p.cat)) return p.cat;
-  if (S.cats.some(c => c.id === "diger")) return "diger";
-  return S.cats[0]?.id || "diger";
-}
-
 /* ---------- Durum ---------- */
 const S = { items: [], cats: DEFAULT_CATS.map(c => ({...c})), sel: "home", filter: "all", q: "", mode: "local" };
 let db = null, uidv = null, itemsCol = null, catsDoc = null, sample = null;
@@ -244,6 +240,57 @@ const LS = {
   get(k, d) { try { const v = localStorage.getItem("sonrabak_" + k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem("sonrabak_" + k, JSON.stringify(v)); } catch {} }
 };
+
+/* ---------- Kategori ağacı yardımcıları ---------- */
+const catById = id => S.cats.find(c => c.id === id) || { id, emoji: "📁", name: "Kategorisiz", parent: null };
+const childrenOf = pid => S.cats.filter(c => (c.parent || null) === (pid || null));
+function ancestors(id) {
+  const out = []; let c = S.cats.find(x => x.id === id); let guard = 0;
+  while (c && guard++ < 10) { out.unshift(c); c = c.parent ? S.cats.find(x => x.id === c.parent) : null; }
+  return out;
+}
+const pathName = id => ancestors(id).map(c => c.name).join(" › ") || catById(id).name;
+function descendantIds(id) {
+  const out = new Set([id]); let added = true;
+  while (added) { added = false; for (const c of S.cats) if (c.parent && out.has(c.parent) && !out.has(c.id)) { out.add(c.id); added = true; } }
+  return out;
+}
+const depthOf = id => ancestors(id).length;
+function treeOrder(pid = null, depth = 0, out = []) {
+  for (const c of childrenOf(pid)) { out.push({ c, depth }); if (depth < 6) treeOrder(c.id, depth + 1, out); }
+  return out;
+}
+function countIn(id) { const ids = descendantIds(id); return S.items.filter(i => ids.has(i.cat)).length; }
+function fixCats(list) {
+  // eksik/yanlış parent'ları düzelt, döngüleri kır
+  const ids = new Set(list.map(c => c.id));
+  for (const c of list) { if (!c.parent || !ids.has(c.parent) || c.parent === c.id) c.parent = null; }
+  for (const c of list) {
+    let p = c.parent, seen = new Set([c.id]);
+    while (p) { if (seen.has(p)) { c.parent = null; break; } seen.add(p); p = (list.find(x => x.id === p) || {}).parent; }
+  }
+  return list;
+}
+
+/* ---------- Kural tabanlı kategori ---------- */
+function ruleCategory(item) {
+  const hay = " " + fold([item.url, item.title, item.note].join(" ")) + " ";
+  let best = null, bestScore = 0;
+  for (const c of S.cats) {
+    const kws = (c.kw || "").split(",").map(s => fold(s.trim()).trim()).filter(Boolean);
+    let score = 0;
+    for (const k of kws) if (k.length <= 3 ? hay.includes(" " + k + " ") : hay.includes(k)) score += k.length > 4 ? 2 : 1; // kısa kelimeler tam kelime olarak eşleşsin
+    const nm = fold(c.name).trim();
+    if (nm.length > 2 && hay.includes(nm)) score += 2;
+    if (score > 0) score += depthOf(c.id) * 0.5; // daha özel (alt) kategori öne geçsin
+    if (score > bestScore) { bestScore = score; best = c.id; }
+  }
+  if (best) return best;
+  const p = platformOf(item.url);
+  if (p.cat && S.cats.some(c => c.id === p.cat)) return p.cat;
+  if (S.cats.some(c => c.id === "diger")) return "diger";
+  return S.cats[0]?.id || "diger";
+}
 
 /* ---------- Tema ---------- */
 function applyTheme(dark) {
@@ -257,15 +304,16 @@ $("#btnTheme").onclick = () => { dark = !dark; applyTheme(dark); LS.set("dark", 
 
 /* ---------- Paylaş ---------- */
 $("#btnShare").onclick = async () => {
-  const data = { title: "Sonra Bak", text: "Sonra Bak — gördüğün içerikleri kaydet, kategorilere ayır.", url: location.href };
+  const url = location.origin + location.pathname;
+  const data = { title: "Sonra Bak", text: "Sonra Bak — gördüğün içerikleri kaydet, kategorilere ayır.", url };
   try { if (navigator.share) { await navigator.share(data); return; } } catch (e) { if (e && e.name === "AbortError") return; }
-  try { await navigator.clipboard.writeText(location.href); toast("Uygulama linki kopyalandı"); }
-  catch { toast("Paylaşmak için sayfanın Paylaş menüsünü kullan"); }
+  try { await navigator.clipboard.writeText(url); toast("Uygulama linki kopyalandı"); }
+  catch { toast("Paylaşmak için tarayıcının Paylaş menüsünü kullan"); }
 };
 
 /* ---------- Toast ---------- */
 let tt;
-function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2300); }
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2400); }
 
 /* ---------- Depolama ---------- */
 async function saveItem(it) {
@@ -282,6 +330,7 @@ async function removeItem(id) {
   else { S.items = S.items.filter(x => x.id !== id); LS.set("items", S.items); render(); }
 }
 async function saveCats() {
+  fixCats(S.cats);
   if (S.mode === "cloud") await catsDoc.set({ list: S.cats });
   else LS.set("cats", S.cats);
   render();
@@ -289,10 +338,24 @@ async function saveCats() {
 
 function setBadge(txt) { $("#syncBadge").textContent = txt; }
 
+// v1.2: eski kayıtlı kategorilere yeni varsayılan alt kategorileri bir kez ekle
+function upgradeCats(list) {
+  if (LS.get("seed12", false)) return list;
+  const ids = new Set(list.map(c => c.id));
+  for (const d of DEFAULT_CATS) {
+    if (ids.has(d.id)) { const c = list.find(x => x.id === d.id); if (c.parent === undefined) c.parent = null; continue; }
+    list.push({ ...d });
+  }
+  LS.set("seed12", true);
+  return fixCats(list);
+}
+
 function loadLocal() {
   S.mode = "local";
   S.items = LS.get("items", []);
-  const c = LS.get("cats", null); if (c && c.length) S.cats = c;
+  const c = LS.get("cats", null);
+  if (c && c.length) { S.cats = upgradeCats(c.map(x => ({ ...x }))); LS.set("cats", S.cats); }
+  else LS.set("seed12", true);
   setBadge("📱 Bu cihazda saklanıyor");
   render();
 }
@@ -305,31 +368,21 @@ async function initCloud() {
     const id = await u.id();
     if (!id) { loadLocal(); return; }
     db = d; uidv = id;
-    const base = db.doc("data/users/" + uidv + "/meta");
-    itemsCol = base.collection("items");
+    itemsCol = db.doc("data/users/" + uidv + "/meta").collection("items");
     catsDoc = db.doc("data/users/" + uidv + "/cats");
     S.mode = "cloud";
     setBadge("⏳ Yükleniyor…");
     const timer = setTimeout(() => setBadge("⚠️ Bağlantı yavaş, bekleniyor…"), 10000);
     catsDoc.onSnapshot(snap => {
-      if (snap.exists) { const l = snap.data().list; if (Array.isArray(l) && l.length) S.cats = l.map(c => ({...c})); }
+      if (snap.exists) { const l = snap.data().list; if (Array.isArray(l) && l.length) S.cats = fixCats(l.map(c => ({...c}))); }
       render();
     }, () => {});
     itemsCol.onSnapshot(snap => {
       if (!snap.metadata.fromCache) { clearTimeout(timer); setBadge("☁️ Hesabında saklanıyor"); }
       S.items = snap.docs.map(d => d.data()).filter(Boolean).sort((a, b) => (b.created || 0) - (a.created || 0));
       render();
-    }, e => { clearTimeout(timer); setBadge("⚠️ Bulut erişimi yok"); });
-    migrateLocal();
-  } catch (e) { loadLocal(); }
-}
-
-async function migrateLocal() {
-  const local = LS.get("items", []);
-  if (!local.length || LS.get("migrated", false)) return;
-  for (const it of local) { try { await itemsCol.doc(it.id).set(it); } catch {} }
-  LS.set("migrated", true);
-  toast(local.length + " kayıt hesabına taşındı");
+    }, () => { clearTimeout(timer); setBadge("⚠️ Bulut erişimi yok"); });
+  } catch { loadLocal(); }
 }
 
 /* ---------- Yapay zekâ ayarları ---------- */
@@ -352,7 +405,7 @@ async function initSample() {
 
 $("#aiWrap").onclick = () => {
   openSheet(`<h3>🤖 Akıllı kategori</h3>
-    <p style="margin:-4px 0 10px;color:var(--muted);font-size:13px">Kaydederken yapay zekâ içeriğe bakıp kategoriyi seçer, gerekirse yeni kategori açar ve başlığı düzeltir. Kapalıyken anahtar kelimeler kullanılır.</p>
+    <p style="margin:-4px 0 10px;color:var(--muted);font-size:13px">Kaydederken yapay zekâ içeriğe bakıp en uygun kategoriyi ve alt kategoriyi seçer; uygun olan yoksa yenisini açar ve başlığı düzeltir. Kapalıyken anahtar kelimeler kullanılır.</p>
     <div style="display:flex;flex-direction:column;gap:8px">
       <select class="field" id="aP">
         <option value="off">Kapalı (yalnızca anahtar kelime)</option>
@@ -362,6 +415,7 @@ $("#aiWrap").onclick = () => {
       <div id="aBox" style="display:flex;flex-direction:column;gap:8px">
         <input class="field" id="aK" type="password" autocomplete="off" placeholder="API anahtarı">
         <input class="field" id="aM" placeholder="Model">
+        <label class="tg"><input type="checkbox" id="aN"> Uygun kategori yoksa yeni kategori aç</label>
         <div id="aHelp" style="font-size:12.5px;color:var(--muted)"></div>
       </div>
       <div id="aRes" style="font-size:13px"></div>
@@ -381,8 +435,9 @@ $("#aiWrap").onclick = () => {
       : "";
   };
   $("#aP").value = AI.provider; $("#aK").value = AI.key; $("#aM").value = AI.model || MODEL_DEF[AI.provider] || "";
+  $("#aN").checked = AI.newCats !== false;
   $("#aP").onchange = sync; sync();
-  const read = () => ({ provider: $("#aP").value, key: $("#aK").value.trim(), model: $("#aM").value.trim() });
+  const read = () => ({ provider: $("#aP").value, key: $("#aK").value.trim(), model: $("#aM").value.trim(), newCats: $("#aN").checked });
   $("#aT").onclick = async () => {
     const conf = read();
     if (!conf.key) { $("#aRes").textContent = "Önce anahtarı yaz."; return; }
@@ -449,11 +504,13 @@ async function fetchTitle(url) {
 async function aiCategorize(item) {
   const useSample = sample && AI.provider === "off";
   if (!useSample && (AI.provider === "off" || !AI.key)) return null;
-  const list = S.cats.map(c => `${c.id}: ${c.name}${c.kw ? " (" + c.kw.split(",").slice(0, 8).join(",") + ")" : ""}`).join("\n");
+  const allowNew = useSample || AI.newCats !== false;
+  const tree = treeOrder().map(({ c }) => "- " + ancestors(c.id).map(a => a.name).join(" > ") + (c.kw ? "  [" + c.kw.split(",").slice(0, 6).join(", ") + "]" : "")).join("\n");
   const prompt =
-`Bir "sonra bak" uygulaması için kaydedilen içeriği kategorilere ayırıyorsun. İnternete erişimin yok; yalnızca aşağıdaki bilgiye bak.
-Mevcut kategoriler (id: ad (örnek kelimeler)):
-${list}
+`Bir "sonra bak" (kaydet, sonra oku) uygulamasında kaydedilen içeriği kategori ağacına yerleştiriyorsun. İnternete erişimin yok; yalnızca aşağıdaki bilgiye bak.
+
+Mevcut kategori ağacı ("Üst > Alt" biçiminde, köşeli parantezde örnek kelimeler):
+${tree}
 
 İçerik:
 URL: ${item.url || "-"}
@@ -461,8 +518,18 @@ Başlık/metin: ${item.title || "-"}
 Not: ${item.note || "-"}
 
 Yalnızca şu JSON'u döndür:
-{"kategori":"<mevcut id>","yeni":null,"baslik":"<kısa Türkçe başlık>"}
-Kurallar: Uygun bir mevcut kategori varsa onun id'sini yaz. Hiçbiri uymuyorsa "kategori":null ve "yeni":{"ad":"<2-3 kelimelik Türkçe ad>","emoji":"<tek emoji>"} yaz. "baslik": verilen başlık anlamlıysa aynen bırak, değilse URL'den çıkarabildiğin en iyi kısa başlığı yaz; çıkaramıyorsan boş bırak.`;
+{"yol":["<üst kategori adı>","<alt kategori adı>"],"emoji":"<tek emoji>","baslik":"<kısa Türkçe başlık>"}
+
+Kurallar:
+- "yol" kökten başlayan kategori adları listesidir, en fazla 2 seviye. Mevcut bir kategoriyi seçiyorsan adını AYNEN yaz.
+- İçeriğe uyan en özel kategoriyi seç: uygun bir alt kategori varsa onu seç (ör. ["Okul","Pardus"]).
+${allowNew
+? `- Uygun alt kategori yoksa ama içerik belirgin bir alt konuya aitse, mevcut üst kategorinin altına YENİ bir alt kategori adı yaz (ör. ["Okul","EBA"]).
+- Hiçbir üst kategori uymuyorsa YENİ bir üst kategori yaz, gerekirse altına bir alt kategori ekle (ör. ["Bahçe","Fide"]).
+- Yeni adlar 1-3 kelimelik, Türkçe, baş harfleri büyük olsun. "Diğer"i yalnızca gerçekten hiçbir şey çıkarılamıyorsa seç.
+- "emoji": yeni açılan en son kategori için uygun tek emoji.`
+: `- Yalnızca mevcut kategorilerden seç, yeni kategori açma. Hiçbiri uymuyorsa ["Diğer"] yaz.`}
+- "baslik": verilen başlık anlamlıysa aynen bırak, değilse URL'den çıkarabildiğin en iyi kısa başlığı yaz; çıkaramıyorsan boş bırak.`;
   try {
     if (useSample) {
       const r = await sample.json(prompt, { modelTier: "quick" });
@@ -474,6 +541,26 @@ Kurallar: Uygun bir mevcut kategori varsa onun id'sini yaz. Hiçbiri uymuyorsa "
     else if (!useSample) toast("Yapay zekâ cevap vermedi, anahtar kelime kullanıldı");
     return null;
   }
+}
+
+// ["Okul","Pardus"] yolunu bul; yoksa (izin varsa) oluştur. {id, created:[...]} döner
+function resolvePath(names, emoji, allowNew) {
+  let parent = null, id = null; const created = [];
+  const clean = (Array.isArray(names) ? names : [names]).map(n => String(n || "").trim()).filter(Boolean).slice(0, 2);
+  for (let i = 0; i < clean.length; i++) {
+    const nm = clean[i];
+    let c = childrenOf(parent).find(x => trLower(x.name) === trLower(nm));
+    if (!c && parent === null) c = S.cats.find(x => trLower(x.name) === trLower(nm) && i === clean.length - 1); // tek ad verildiyse her yerde ara
+    if (!c) {
+      if (!allowNew) break;
+      c = { id: "c" + uid8(), emoji: i === clean.length - 1 ? (String(emoji || "📁").slice(0, 4) || "📁") : "📁", name: nm.slice(0, 30), parent, kw: "" };
+      if (parent === null) { const di = S.cats.findIndex(x => x.id === "diger"); S.cats.splice(di >= 0 ? di : S.cats.length, 0, c); }
+      else S.cats.push(c);
+      created.push(c);
+    }
+    parent = c.id; id = c.id;
+  }
+  return { id, created };
 }
 
 /* ---------- Düzeltmelerden öğren ---------- */
@@ -509,43 +596,51 @@ $("#btnSave").onclick = async () => {
       cat: $("#inCat").value, auto: false, read: false, fav: false, created: Date.now()
     };
     if (!url) it.note = it.note || (raw.length > 140 ? raw : "");
-    let catMsg = "";
     if (url && !userTitle) {
       const ft = await fetchTitle(url);
       if (ft) it.title = ft.title + (ft.author ? " · " + ft.author : "");
     }
+    let catMsg = "";
     if (it.cat === "__auto") {
       it.auto = true;
+      const useSample = sample && AI.provider === "off";
       const ai = await aiCategorize({ ...it, title: userTitle || raw.replace(url, "").trim() || it.title });
-      if (ai && ai.kategori && S.cats.some(c => c.id === ai.kategori)) {
-        it.cat = ai.kategori;
-      } else if (ai && ai.yeni && ai.yeni.ad) {
-        const nc = { id: "c" + uid8(), emoji: (ai.yeni.emoji || "📁").slice(0, 4), name: String(ai.yeni.ad).slice(0, 30), kw: "" };
-        S.cats.splice(Math.max(0, S.cats.length - 1), 0, nc);
-        await saveCats();
-        it.cat = nc.id; catMsg = " (yeni kategori)";
-      } else {
-        it.cat = ruleCategory(it);
+      let picked = null;
+      if (ai && (ai.yol || ai.kategori)) {
+        const r = resolvePath(ai.yol || [ai.kategori], ai.emoji, useSample || AI.newCats !== false);
+        picked = r.id;
+        if (r.created.length) { await saveCats(); catMsg = " · yeni: " + r.created.map(c => c.name).join(" › "); }
       }
-      if (ai && ai.baslik && !userTitle && ai.baslik.length > 3) it.title = String(ai.baslik).slice(0, 160);
+      it.cat = picked || ruleCategory(it);
+      if (ai && ai.baslik && !userTitle && String(ai.baslik).length > 3 && !/· /.test(it.title)) it.title = String(ai.baslik).slice(0, 160);
     }
     await saveItem(it);
     const c = catById(it.cat);
-    toast(`${c.emoji} ${c.name} kategorisine kaydedildi${catMsg}`);
+    toast(`${c.emoji} ${pathName(it.cat)} içine kaydedildi${catMsg}`);
     $("#inUrl").value = ""; $("#inTitle").value = ""; $("#inNote").value = ""; $("#more").classList.remove("open");
   } catch (e) {
     toast(e && e.code === "quota_exceeded" ? "Depolama dolu, eski kayıtları sil" : "Kaydedilemedi, tekrar dene");
   } finally { btn.disabled = false; btn.textContent = "Kaydet"; }
 };
 $("#inUrl").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#btnSave").click(); } });
-$("#inUrl").addEventListener("paste", () => setTimeout(() => {
-  const v = $("#inUrl").value; if (extractUrl(v)) $("#btnSave").focus();
-}, 0));
+
+/* ---------- Gezinme (geri tuşu çalışsın diye #adres) ---------- */
+function go(sel) {
+  const h = sel === "home" ? "" : "#" + (sel === "all" ? "tumu" : "k-" + sel);
+  if (location.hash !== h) {
+    if (h) location.hash = h; else history.pushState(null, "", location.pathname + location.search);
+  }
+  applyHash();
+}
+function applyHash() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  S.sel = h === "tumu" ? "all" : h.startsWith("k-") && S.cats.some(c => c.id === h.slice(2)) ? h.slice(2) : "home";
+  render(); window.scrollTo({ top: 0 });
+}
+window.addEventListener("hashchange", applyHash);
+window.addEventListener("popstate", applyHash);
 
 /* ---------- Görünüm ---------- */
-const catById = id => S.cats.find(c => c.id === id) || { id, emoji: "📁", name: "Kategorisiz" };
-function countIn(id) { return S.items.filter(i => i.cat === id).length; }
-
 function fmtDate(ts) {
   const d = new Date(ts), now = new Date();
   const diff = (now - d) / 86400000;
@@ -554,48 +649,75 @@ function fmtDate(ts) {
   return d.toLocaleDateString("tr", { day: "numeric", month: "short", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric" });
 }
 
+function catOptions(selected, { auto = false, none = false, exclude = null } = {}) {
+  const ex = exclude ? descendantIds(exclude) : new Set();
+  return (auto ? `<option value="__auto">🤖 Otomatik kategori</option>` : "") +
+    (none ? `<option value="">— Üst kategori yok (ana kategori)</option>` : "") +
+    treeOrder().filter(({ c }) => !ex.has(c.id)).map(({ c, depth }) =>
+      `<option value="${esc(c.id)}" ${c.id === selected ? "selected" : ""}>${"    ".repeat(depth)}${depth ? "└ " : ""}${esc(c.emoji)} ${esc(c.name)}</option>`).join("");
+}
+
+function catRow(c) {
+  const n = countIn(c.id), subs = childrenOf(c.id);
+  const unread = S.items.filter(i => descendantIds(c.id).has(i.cat) && !i.read).length;
+  const info = [subs.length ? subs.length + " alt kategori" : "", unread ? unread + " bakılmadı" : ""].filter(Boolean).join(" · ");
+  return `<button class="crow2" data-go="${esc(c.id)}">
+    <span class="e">${esc(c.emoji)}</span>
+    <span class="n"><b>${esc(c.name)}</b>${info ? `<small>${esc(info)}</small>` : ""}</span>
+    <span class="cnt">${n}</span><span class="ch">›</span></button>`;
+}
+
 function render() {
-  // seçim kutusu
+  if (S.sel !== "home" && S.sel !== "all" && !S.cats.some(c => c.id === S.sel)) S.sel = "home";
+
+  // kaydet kutusundaki seçim
   const sel = $("#inCat"), prev = sel.value || "__auto";
-  sel.innerHTML = `<option value="__auto">🤖 Otomatik kategori</option>` + S.cats.map(c => `<option value="${esc(c.id)}">${esc(c.emoji)} ${esc(c.name)}</option>`).join("");
+  sel.innerHTML = catOptions(null, { auto: true });
   sel.value = [...sel.options].some(o => o.value === prev) ? prev : "__auto";
 
-  // kategori şeridi
-  const unread = S.items.filter(i => !i.read).length;
-  $("#catBar").innerHTML =
-    `<button class="cat ${S.sel === "home" ? "on" : ""}" data-c="home">🏠 Ana sayfa</button>` +
-    `<button class="cat ${S.sel === "all" ? "on" : ""}" data-c="all">Tümü<b>${S.items.length}</b></button>` +
-    S.cats.map(c => `<button class="cat ${S.sel === c.id ? "on" : ""}" data-c="${esc(c.id)}">${esc(c.emoji)} ${esc(c.name)}<b>${countIn(c.id)}</b></button>`).join("");
-
-  // ana sayfa kutuları
-  const showHome = S.sel === "home" && !S.q;
-  $("#home").innerHTML = showHome && S.items.length ? `<div class="grid">${
-    S.cats.filter(c => countIn(c.id) > 0).map(c => {
-      const n = countIn(c.id), u = S.items.filter(i => i.cat === c.id && !i.read).length;
-      return `<button class="tile" data-c="${esc(c.id)}"><span class="e">${esc(c.emoji)}</span><span class="n">${esc(c.name)}</span><span class="c">${n} kayıt${u ? " · " + u + " bakılmadı" : ""}</span></button>`;
-    }).join("")}</div>` : "";
+  // gezinme alanı
+  let nav = "";
+  if (!S.q) {
+    if (S.sel === "home") {
+      nav = `<div class="sec"><h2>Kategoriler</h2><button class="lnk" data-newcat="">＋ Yeni</button></div>
+        <div class="clist">${childrenOf(null).map(catRow).join("")}
+        <button class="crow2" data-go="all"><span class="e">📚</span><span class="n"><b>Tüm kayıtlar</b></span><span class="cnt">${S.items.length}</span><span class="ch">›</span></button></div>`;
+    } else if (S.sel !== "all") {
+      const c = catById(S.sel), anc = ancestors(S.sel), subs = childrenOf(S.sel);
+      nav = `<div class="crumb"><button data-go="home">🏠 Ana sayfa</button>${anc.slice(0, -1).map(a => `<span>›</span><button data-go="${esc(a.id)}">${esc(a.name)}</button>`).join("")}</div>
+        <div class="chead"><span class="e">${esc(c.emoji)}</span><h1>${esc(c.name)}</h1>
+          <button class="btn sm" data-editcat="${esc(c.id)}">✏️</button></div>
+        <div class="sec"><h2>Alt kategoriler</h2><button class="lnk" data-newcat="${esc(c.id)}">＋ Alt kategori</button></div>
+        ${subs.length ? `<div class="clist">${subs.map(catRow).join("")}</div>` : `<p style="color:var(--muted);font-size:13px;margin:0 2px 16px">Alt kategori yok.</p>`}`;
+    } else {
+      nav = `<div class="crumb"><button data-go="home">🏠 Ana sayfa</button></div>`;
+    }
+  }
+  $("#nav").innerHTML = nav;
 
   // liste
   let arr = S.items.slice();
-  if (S.sel !== "home" && S.sel !== "all") arr = arr.filter(i => i.cat === S.sel);
+  if (S.sel !== "home" && S.sel !== "all") { const ids = descendantIds(S.sel); arr = arr.filter(i => ids.has(i.cat)); }
   if (S.filter === "unread") arr = arr.filter(i => !i.read);
   if (S.filter === "fav") arr = arr.filter(i => i.fav);
   if (S.q) {
-    const words = trLower(S.q).split(/\s+/).filter(Boolean);
-    arr = arr.filter(i => { const h = trLower([i.title, i.note, i.url, catById(i.cat).name, pByKey(i.platform).label].join(" ")); return words.every(w => h.includes(w)); });
+    const words = fold(S.q).split(/\s+/).filter(Boolean);
+    arr = S.items.filter(i => { const h = fold([i.title, i.note, i.url, pathName(i.cat), pByKey(i.platform).label].join(" ")); return words.every(w => h.includes(w)); });
   }
+  const showHome = S.sel === "home" && !S.q;
   if (showHome) arr = arr.slice(0, 15);
 
   $("#listTitle").textContent = S.q ? `“${S.q}” için ${arr.length} sonuç`
-    : S.sel === "home" ? "Son kaydedilenler"
+    : showHome ? "Son kaydedilenler"
     : S.sel === "all" ? "Tüm kayıtlar"
-    : catById(S.sel).emoji + " " + catById(S.sel).name;
+    : "Kayıtlar (" + arr.length + ")";
 
   $("#list").innerHTML = arr.length ? arr.map(itemHTML).join("") :
     `<div class="empty"><div class="big">${S.items.length ? "🔎" : "📥"}</div>${
-      S.items.length ? "Burada kayıt yok." : "Henüz kayıt yok.<br>Instagram, YouTube ya da bir sitede <b>Paylaş → Bağlantıyı kopyala</b> de,<br>sonra yukarıya yapıştırıp <b>Kaydet</b>'e bas."}</div>`;
+      S.items.length ? "Burada kayıt yok." : "Henüz kayıt yok.<br>Instagram, YouTube ya da bir sitede <b>Paylaş</b>'a bas,<br>listeden <b>Sonra Bak</b>'ı seç ya da linki kopyalayıp yukarıya yapıştır."}</div>`;
 
-  $("#stat").textContent = S.items.length ? `${S.items.length} kayıt · ${unread} bakılmadı` : "";
+  const unread = S.items.filter(i => !i.read).length;
+  $("#stat").textContent = S.items.length ? `${S.items.length} kayıt · ${unread} bakılmadı · ${S.cats.length} kategori` : "";
 }
 
 function itemHTML(i) {
@@ -609,7 +731,7 @@ function itemHTML(i) {
     <div class="body">
       ${titleEl}
       <div class="meta">
-        <button class="chipb" data-act="cat">${esc(c.emoji)} ${esc(c.name)}${i.auto ? " 🤖" : ""}</button>
+        <button class="chipb" data-act="cat">${esc(c.emoji)} ${esc(pathName(i.cat))}${i.auto ? " 🤖" : ""}</button>
         <span>${esc(safeUrl ? domainOf(safeUrl) : p.label)}</span><span>·</span><span>${fmtDate(i.created)}</span>
       </div>
       ${i.note ? `<div class="note">${esc(i.note)}</div>` : ""}
@@ -626,17 +748,22 @@ function itemHTML(i) {
 
 /* ---------- Olaylar ---------- */
 document.addEventListener("click", async e => {
-  const c = e.target.closest("[data-c]");
-  if (c) { S.sel = c.dataset.c; S.q = ""; $("#q").value = ""; render(); window.scrollTo({ top: 0 }); return; }
+  if (e.target.closest("#sheet")) return; // alt sayfa kendi düğmelerini yönetir
+  const g = e.target.closest("[data-go]");
+  if (g) { S.q = ""; $("#q").value = ""; go(g.dataset.go); return; }
+  const nc = e.target.closest("[data-newcat]");
+  if (nc) { openCatEdit(null, nc.dataset.newcat || null); return; }
+  const ec = e.target.closest("[data-editcat]");
+  if (ec) { openCatEdit(ec.dataset.editcat); return; }
   const f = e.target.closest("[data-f]");
   if (f) { S.filter = f.dataset.f; document.querySelectorAll("[data-f]").forEach(b => b.classList.toggle("on", b === f)); render(); return; }
-  const a = e.target.closest("[data-act]");
   const op = e.target.closest("[data-open]");
   if (op) {
     const it = S.items.find(x => x.id === op.dataset.open);
     if (it && !it.read) setTimeout(() => saveItem({ ...it, read: true }).catch(() => {}), 400);
     return;
   }
+  const a = e.target.closest("[data-act]");
   if (!a) return;
   const id = a.closest("[data-id]")?.dataset.id; const it = S.items.find(x => x.id === id);
   if (!it) return;
@@ -666,10 +793,18 @@ function openConfirm(msg, onYes) {
 }
 
 function openCatPicker(it) {
-  openSheet(`<h3>Kategori seç</h3>${S.cats.map(c => `<button class="opt ${c.id === it.cat ? "on" : ""}" data-pick="${esc(c.id)}"><span style="font-size:20px">${esc(c.emoji)}</span>${esc(c.name)}</button>`).join("")}`);
+  openSheet(`<h3>Kategori seç</h3><div class="tree">${treeOrder().map(({ c, depth }) =>
+    `<button class="opt ${c.id === it.cat ? "on" : ""}" data-pick="${esc(c.id)}" style="padding-left:${10 + depth * 26}px">${depth ? '<span style="color:var(--muted)">└</span>' : ""}<span style="font-size:20px">${esc(c.emoji)}</span>${esc(c.name)}</button>`).join("")}</div>
+    <button class="btn sm" id="pNew" style="margin-top:10px">＋ Yeni kategori</button>`);
   $("#sheet").querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
-    closeSheet(); await saveItem({ ...it, cat: b.dataset.pick, auto: false });
-    if (b.dataset.pick !== it.cat) { learnFrom(it, b.dataset.pick); toast("Kategori değişti · bir dahakine hatırlayacak"); } else toast("Kategori aynı");
+    closeSheet();
+    if (b.dataset.pick === it.cat) return;
+    await saveItem({ ...it, cat: b.dataset.pick, auto: false });
+    learnFrom(it, b.dataset.pick);
+    toast("Taşındı: " + pathName(b.dataset.pick) + " · bir dahakine hatırlayacak");
+  });
+  $("#pNew").onclick = () => openCatEdit(null, null, async newId => {
+    await saveItem({ ...it, cat: newId, auto: false }); learnFrom(it, newId);
   });
 }
 
@@ -679,7 +814,7 @@ function openEdit(it) {
       <input class="field" id="eT" value="${esc(it.title)}" placeholder="Başlık">
       <input class="field" id="eU" value="${esc(it.url)}" placeholder="Link">
       <textarea class="field" id="eN" rows="3" placeholder="Not">${esc(it.note)}</textarea>
-      <select class="field" id="eC">${S.cats.map(c => `<option value="${esc(c.id)}" ${c.id === it.cat ? "selected" : ""}>${esc(c.emoji)} ${esc(c.name)}</option>`).join("")}</select>
+      <select class="field" id="eC">${catOptions(it.cat)}</select>
       <div class="row" style="justify-content:flex-end"><button class="btn" id="eX">Vazgeç</button><button class="btn pri" id="eS">Kaydet</button></div>
     </div>`);
   $("#eX").onclick = closeSheet;
@@ -691,51 +826,81 @@ function openEdit(it) {
   };
 }
 
-/* ---------- Kategori yönetimi ---------- */
+/* ---------- Kategori ekle / düzenle ---------- */
 $("#btnCats").onclick = openCatManager;
 function openCatManager() {
-  const draft = S.cats.map(c => ({ ...c }));
-  const draw = () => {
-    openSheet(`<h3>Kategoriler</h3>
-      <p style="margin:-6px 0 8px;color:var(--muted);font-size:13px">Anahtar kelimeler otomatik kategoride kullanılır (virgülle ayır).</p>
-      <div id="cl">${draft.map((c, i) => `<div style="border-bottom:1px solid var(--line);padding:8px 0">
-        <div class="row" style="flex-wrap:nowrap">
-          <input class="field em" data-i="${i}" data-k="emoji" value="${esc(c.emoji)}" style="width:50px;text-align:center">
-          <input class="field nm" data-i="${i}" data-k="name" value="${esc(c.name)}" style="flex:1">
-          <button class="ib" data-up="${i}" title="Yukarı">⬆️</button>
-          <button class="ib" data-rm="${i}" title="Sil">🗑️</button>
-        </div>
-        <input class="field kw" data-i="${i}" data-k="kw" value="${esc(c.kw || "")}" placeholder="anahtar kelimeler: tarif, yemek, …">
-      </div>`).join("")}</div>
-      <div class="row" style="margin-top:12px;justify-content:space-between">
-        <button class="btn sm" id="cAdd">＋ Yeni kategori</button>
-        <div class="row"><button class="btn" id="cX">Vazgeç</button><button class="btn pri" id="cS">Kaydet</button></div>
-      </div>`);
-    $("#sheet").querySelectorAll("input[data-i]").forEach(inp => inp.oninput = () => { draft[+inp.dataset.i][inp.dataset.k] = inp.value; });
-    $("#sheet").querySelectorAll("[data-up]").forEach(b => b.onclick = () => { const i = +b.dataset.up; if (i > 0) { [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; draw(); } });
-    $("#sheet").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => {
-      const i = +b.dataset.rm, n = countIn(draft[i].id);
-      if (draft.length <= 1) { toast("En az bir kategori kalmalı"); return; }
-      if (n && !b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Emin misin?"; toast(`${n} kayıt "Diğer"e taşınacak`); return; }
-      draft.splice(i, 1); draw();
-    });
-    $("#cAdd").onclick = () => { draft.push({ id: "c" + uid8(), emoji: "📁", name: "Yeni kategori", kw: "" }); draw(); const l = $("#cl").lastElementChild; l && l.querySelector(".nm").select(); };
-    $("#cX").onclick = closeSheet;
-    $("#cS").onclick = async () => {
-      const clean = draft.map(c => ({ ...c, name: (c.name || "").trim() || "Adsız", emoji: (c.emoji || "📁").trim().slice(0, 4) }));
-      const ids = new Set(clean.map(c => c.id));
-      let fallback = clean.find(c => c.id === "diger");
-      const orphans = S.items.filter(i => !ids.has(i.cat));
-      if (orphans.length && !fallback) { fallback = { id: "diger", emoji: "📦", name: "Diğer", kw: "" }; clean.push(fallback); }
-      S.cats = clean; closeSheet();
-      try {
-        await saveCats();
-        for (const o of orphans) await saveItem({ ...o, cat: fallback.id });
-        toast("Kategoriler kaydedildi");
-      } catch { toast("Kaydedilemedi"); }
-    };
+  openSheet(`<h3>🗂️ Kategoriler</h3>
+    <p style="margin:-6px 0 8px;color:var(--muted);font-size:13px">Düzenlemek için bir kategoriye dokun.</p>
+    <div class="tree">${treeOrder().map(({ c, depth }) =>
+      `<button class="opt" data-ec="${esc(c.id)}" style="padding-left:${10 + depth * 26}px">${depth ? '<span style="color:var(--muted)">└</span>' : ""}<span style="font-size:20px">${esc(c.emoji)}</span><span style="flex:1">${esc(c.name)}</span><span style="color:var(--muted);font-size:12px">${countIn(c.id)}</span></button>`).join("")}</div>
+    <div class="row" style="margin-top:12px;justify-content:space-between">
+      <button class="btn sm pri" id="mNew">＋ Yeni kategori</button><button class="btn sm" id="mX">Kapat</button>
+    </div>`);
+  $("#sheet").querySelectorAll("[data-ec]").forEach(b => b.onclick = () => openCatEdit(b.dataset.ec, null, null, openCatManager));
+  $("#mNew").onclick = () => openCatEdit(null, null, null, openCatManager);
+  $("#mX").onclick = closeSheet;
+}
+
+function openCatEdit(id, parentId = null, onCreated = null, back = null) {
+  const isNew = !id;
+  const c = isNew ? { id: "c" + uid8(), emoji: "📁", name: "", kw: "", parent: parentId || null } : { ...catById(id) };
+  const n = isNew ? 0 : countIn(c.id), subs = isNew ? [] : childrenOf(c.id);
+  openSheet(`<h3>${isNew ? (parentId ? "Alt kategori ekle" : "Yeni kategori") : "Kategoriyi düzenle"}</h3>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div class="row" style="flex-wrap:nowrap">
+        <input class="field" id="kE" value="${esc(c.emoji)}" style="width:56px;text-align:center;font-size:20px" maxlength="4">
+        <input class="field" id="kN" value="${esc(c.name)}" placeholder="Kategori adı" style="flex:1">
+      </div>
+      <label style="font-size:13px;color:var(--muted)">Üst kategori</label>
+      <select class="field" id="kP">${catOptions(c.parent, { none: true, exclude: isNew ? null : c.id })}</select>
+      <label style="font-size:13px;color:var(--muted)">Anahtar kelimeler (otomatik kategori için, virgülle ayır)</label>
+      <textarea class="field" id="kK" rows="2" placeholder="pardus, etap, linux">${esc(c.kw || "")}</textarea>
+      <div class="row" style="justify-content:space-between;margin-top:4px">
+        ${isNew ? "<span></span>" : `<button class="btn sm" id="kD" style="color:var(--acc)">🗑️ Sil</button>`}
+        <div class="row"><button class="btn" id="kX">Vazgeç</button><button class="btn pri" id="kS">Kaydet</button></div>
+      </div>
+      ${!isNew && (n || subs.length) ? `<p style="font-size:12.5px;color:var(--muted);margin:0">Silersen ${n ? n + " kayıt" : ""}${n && subs.length ? " ve " : ""}${subs.length ? subs.length + " alt kategori" : ""} bir üst seviyeye taşınır.</p>` : ""}
+    </div>`);
+  if ($("#sheet").querySelector("select#kP")) $("#kP").value = c.parent || "";
+  if (isNew) setTimeout(() => $("#kN").focus(), 50);
+  $("#kX").onclick = () => back ? back() : closeSheet();
+  $("#kS").onclick = async () => {
+    const name = $("#kN").value.trim();
+    if (!name) { toast("Kategori adı yaz"); return; }
+    const parent = $("#kP").value || null;
+    if (childrenOf(parent).some(x => x.id !== c.id && trLower(x.name) === trLower(name))) { toast("Bu adla bir kategori zaten var"); return; }
+    const upd = { ...c, name: name.slice(0, 30), emoji: ($("#kE").value.trim() || "📁").slice(0, 4), parent,
+      kw: $("#kK").value.split(",").map(s => s.trim()).filter(Boolean).join(",") };
+    if (isNew) {
+      if (!parent) { const di = S.cats.findIndex(x => x.id === "diger"); S.cats.splice(di >= 0 ? di : S.cats.length, 0, upd); }
+      else S.cats.push(upd);
+    } else S.cats = S.cats.map(x => x.id === c.id ? upd : x);
+    try {
+      await saveCats();
+      if (onCreated) await onCreated(upd.id);
+      toast(isNew ? "Eklendi: " + pathName(upd.id) : "Kaydedildi");
+    } catch { toast("Kaydedilemedi"); }
+    back ? back() : closeSheet();
   };
-  draw();
+  if (!isNew) $("#kD").onclick = () => {
+    const btn = $("#kD");
+    if (!btn.dataset.sure) { btn.dataset.sure = "1"; btn.textContent = "Emin misin? Tekrar bas"; return; }
+    deleteCat(c.id).then(() => { toast("Silindi"); back ? back() : closeSheet(); });
+  };
+}
+
+async function deleteCat(id) {
+  const c = catById(id);
+  const target = c.parent || (id !== "diger" && S.cats.some(x => x.id === "diger") ? "diger" : null);
+  for (const ch of childrenOf(id)) ch.parent = c.parent || null;
+  S.cats = S.cats.filter(x => x.id !== id);
+  let fallback = target;
+  if (!fallback) { fallback = "diger"; if (!S.cats.some(x => x.id === "diger")) S.cats.push({ id: "diger", emoji: "📦", name: "Diğer", parent: null, kw: "" }); }
+  try {
+    await saveCats();
+    for (const it of S.items.filter(i => i.cat === id)) await saveItem({ ...it, cat: fallback });
+  } catch { toast("Kaydedilemedi"); }
+  if (S.sel === id) go(c.parent || "home");
 }
 
 /* ---------- Yedek ---------- */
@@ -766,7 +931,7 @@ $("#btnImport").onclick = () => {
     if (!d || !Array.isArray(d.items)) { toast("Geçersiz yedek"); return; }
     closeSheet();
     if (Array.isArray(d.cats)) {
-      for (const c of d.cats) if (c && c.id && !S.cats.some(x => x.id === c.id)) S.cats.push({ id: String(c.id), emoji: String(c.emoji || "📁"), name: String(c.name || "Adsız"), kw: String(c.kw || "") });
+      for (const c of d.cats) if (c && c.id && !S.cats.some(x => x.id === c.id)) S.cats.push({ id: String(c.id), emoji: String(c.emoji || "📁"), name: String(c.name || "Adsız"), kw: String(c.kw || ""), parent: c.parent ? String(c.parent) : null });
       await saveCats();
     }
     const have = new Set(S.items.map(i => i.id)); let n = 0;
@@ -800,6 +965,7 @@ if ("serviceWorker" in navigator && location.protocol === "https:") {
 render();
 initCloud();
 initSample();
+applyHash();
 handleShared();
 })();
 </script>
