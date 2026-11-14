@@ -102,7 +102,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 </head>
 <body>
 <header>
-  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.0</span></div>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.1</span></div>
   <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
   <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
   <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
@@ -121,7 +121,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
       <button class="btn pri" id="btnSave">Kaydet</button>
     </div>
     <div class="row" style="margin-top:8px;justify-content:space-between">
-      <label class="tg" id="aiWrap" style="display:none"><input type="checkbox" id="aiOn" checked> Claude ile akıllı kategori</label>
+      <button class="tg lnk" id="aiWrap" style="color:var(--muted)">🤖 Akıllı kategori: <b id="aiState">Kapalı</b> · <span style="color:var(--acc)">Ayarla</span></button>
       <span class="badge" id="syncBadge">⏳ Bağlanıyor…</span>
     </div>
   </section>
@@ -155,7 +155,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
 <script>
 (() => {
-const VERSION = "1.0";
+const VERSION = "1.1";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -332,22 +332,127 @@ async function migrateLocal() {
   toast(local.length + " kayıt hesabına taşındı");
 }
 
-async function initSample() {
-  if (!window.claude || !window.claude.use) return;
-  try {
-    sample = await claude.use("sample");
-    if (sample) { $("#aiWrap").style.display = "flex"; $("#aiOn").checked = LS.get("ai", true); }
-  } catch { sample = null; }
-}
-$("#aiOn").onchange = e => LS.set("ai", e.target.checked);
+/* ---------- Yapay zekâ ayarları ---------- */
+const AI_DEF = { provider: "off", key: "", model: "" };
+const MODEL_DEF = { gemini: "gemini-2.5-flash", claude: "claude-haiku-5-5" };
+let AI = { ...AI_DEF, ...LS.get("aiConf", {}) };
 
-/* ---------- Claude ile kategori ---------- */
+function aiLabel() {
+  if (sample && AI.provider === "off") return "Claude (bu sayfa)";
+  return { off: "Kapalı", gemini: "Gemini", claude: "Claude API" }[AI.provider] || "Kapalı";
+}
+function refreshAiState() { $("#aiState").textContent = aiLabel(); }
+
+async function initSample() {
+  refreshAiState();
+  if (!window.claude || !window.claude.use) return;
+  try { sample = await claude.use("sample"); } catch { sample = null; }
+  refreshAiState();
+}
+
+$("#aiWrap").onclick = () => {
+  openSheet(`<h3>🤖 Akıllı kategori</h3>
+    <p style="margin:-4px 0 10px;color:var(--muted);font-size:13px">Kaydederken yapay zekâ içeriğe bakıp kategoriyi seçer, gerekirse yeni kategori açar ve başlığı düzeltir. Kapalıyken anahtar kelimeler kullanılır.</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <select class="field" id="aP">
+        <option value="off">Kapalı (yalnızca anahtar kelime)</option>
+        <option value="gemini">Google Gemini — ücretsiz anahtar</option>
+        <option value="claude">Claude (Anthropic API) — ücretli</option>
+      </select>
+      <div id="aBox" style="display:flex;flex-direction:column;gap:8px">
+        <input class="field" id="aK" type="password" autocomplete="off" placeholder="API anahtarı">
+        <input class="field" id="aM" placeholder="Model">
+        <div id="aHelp" style="font-size:12.5px;color:var(--muted)"></div>
+      </div>
+      <div id="aRes" style="font-size:13px"></div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn" id="aT">Dene</button><button class="btn pri" id="aS">Kaydet</button>
+      </div>
+    </div>`);
+  const sync = () => {
+    const pv = $("#aP").value;
+    $("#aBox").style.display = pv === "off" ? "none" : "flex";
+    $("#aT").style.display = pv === "off" ? "none" : "";
+    if (!$("#aM").value || Object.values(MODEL_DEF).includes($("#aM").value)) $("#aM").value = MODEL_DEF[pv] || "";
+    $("#aHelp").innerHTML = pv === "gemini"
+      ? 'Anahtar al: <a class="lnk" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> → "Create API key". Ücretsiz katmanda Google gönderilen metni ürün geliştirmede kullanabilir; yalnızca link, başlık ve not gönderilir.'
+      : pv === "claude"
+      ? 'Anahtar al: <a class="lnk" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> → API Keys. Kayıt başına çok küçük bir ücret düşer.'
+      : "";
+  };
+  $("#aP").value = AI.provider; $("#aK").value = AI.key; $("#aM").value = AI.model || MODEL_DEF[AI.provider] || "";
+  $("#aP").onchange = sync; sync();
+  const read = () => ({ provider: $("#aP").value, key: $("#aK").value.trim(), model: $("#aM").value.trim() });
+  $("#aT").onclick = async () => {
+    const conf = read();
+    if (!conf.key) { $("#aRes").textContent = "Önce anahtarı yaz."; return; }
+    $("#aRes").innerHTML = '<span class="spin"></span> Deneniyor…';
+    try {
+      const r = await callProvider(conf, 'Yalnızca şu JSON\'u döndür: {"tamam":true}');
+      $("#aRes").innerHTML = r && r.tamam ? '<span style="color:var(--ok)">✔ Çalışıyor</span>' : "Cevap geldi ama beklenen biçimde değil.";
+    } catch (e) { $("#aRes").innerHTML = '<span style="color:var(--acc)">✖ ' + esc(e.message || "Hata") + "</span>"; }
+  };
+  $("#aS").onclick = () => {
+    AI = read(); LS.set("aiConf", AI); refreshAiState(); closeSheet();
+    toast(AI.provider === "off" ? "Akıllı kategori kapalı" : "Akıllı kategori açık");
+  };
+};
+
+function parseJsonLoose(text) {
+  const m = String(text || "").match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("JSON yok");
+  return JSON.parse(m[0]);
+}
+
+async function callProvider(conf, prompt) {
+  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 20000);
+  try {
+    if (conf.provider === "gemini") {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(conf.model || MODEL_DEF.gemini)}:generateContent`, {
+        method: "POST", signal: ctl.signal,
+        headers: { "content-type": "application/json", "x-goog-api-key": conf.key },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error?.message || "Gemini hata " + r.status);
+      return parseJsonLoose(j.candidates?.[0]?.content?.parts?.map(p => p.text).join("") || "");
+    }
+    if (conf.provider === "claude") {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", signal: ctl.signal,
+        headers: { "content-type": "application/json", "x-api-key": conf.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({ model: conf.model || MODEL_DEF.claude, max_tokens: 300, messages: [{ role: "user", content: prompt }] })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error?.message || "Claude hata " + r.status);
+      return parseJsonLoose((j.content || []).map(c => c.text || "").join(""));
+    }
+    return null;
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("Zaman aşımı");
+    throw e;
+  } finally { clearTimeout(to); }
+}
+
+/* ---------- YouTube vb. başlığını çek (noembed) ---------- */
+async function fetchTitle(url) {
+  if (!/(youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|soundcloud\.com|flickr\.com)/i.test(url || "")) return null;
+  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 4000);
+  try {
+    const r = await fetch("https://noembed.com/embed?url=" + encodeURIComponent(url), { signal: ctl.signal });
+    const j = await r.json();
+    return j && j.title ? { title: String(j.title), author: String(j.author_name || "") } : null;
+  } catch { return null; } finally { clearTimeout(to); }
+}
+
+/* ---------- Akıllı kategori ---------- */
 async function aiCategorize(item) {
-  if (!sample || !$("#aiOn").checked) return null;
-  const list = S.cats.map(c => `${c.id}: ${c.name}`).join("\n");
+  const useSample = sample && AI.provider === "off";
+  if (!useSample && (AI.provider === "off" || !AI.key)) return null;
+  const list = S.cats.map(c => `${c.id}: ${c.name}${c.kw ? " (" + c.kw.split(",").slice(0, 8).join(",") + ")" : ""}`).join("\n");
   const prompt =
 `Bir "sonra bak" uygulaması için kaydedilen içeriği kategorilere ayırıyorsun. İnternete erişimin yok; yalnızca aşağıdaki bilgiye bak.
-Mevcut kategoriler (id: ad):
+Mevcut kategoriler (id: ad (örnek kelimeler)):
 ${list}
 
 İçerik:
@@ -359,12 +464,32 @@ Yalnızca şu JSON'u döndür:
 {"kategori":"<mevcut id>","yeni":null,"baslik":"<kısa Türkçe başlık>"}
 Kurallar: Uygun bir mevcut kategori varsa onun id'sini yaz. Hiçbiri uymuyorsa "kategori":null ve "yeni":{"ad":"<2-3 kelimelik Türkçe ad>","emoji":"<tek emoji>"} yaz. "baslik": verilen başlık anlamlıysa aynen bırak, değilse URL'den çıkarabildiğin en iyi kısa başlığı yaz; çıkaramıyorsan boş bırak.`;
   try {
-    const r = await sample.json(prompt, { modelTier: "quick" });
-    return r && typeof r === "object" ? r : null;
+    if (useSample) {
+      const r = await sample.json(prompt, { modelTier: "quick" });
+      return r && typeof r === "object" ? r : null;
+    }
+    return await callProvider(AI, prompt);
   } catch (e) {
-    if (e && e.code === "not_granted") { sample = null; $("#aiWrap").style.display = "none"; }
+    if (e && e.code === "not_granted") { sample = null; refreshAiState(); }
+    else if (!useSample) toast("Yapay zekâ cevap vermedi, anahtar kelime kullanıldı");
     return null;
   }
+}
+
+/* ---------- Düzeltmelerden öğren ---------- */
+const STOP = new Set("ve,ile,için,bir,bu,şu,çok,daha,gibi,olan,nasıl,neden,video,videosu,gönderisi,instagram,youtube,reels,shorts,tiktok,https,http,www,com,the,and,for,with,you,your,from,this,that".split(","));
+async function learnFrom(it, catId) {
+  const c = S.cats.find(x => x.id === catId); if (!c) return;
+  const have = new Set((c.kw || "").split(",").map(k => trLower(k.trim())).filter(Boolean));
+  const add = [];
+  const dom = domainOf(it.url);
+  if (dom && pByKey(it.platform).k === "web" && !have.has(dom)) add.push(dom);
+  const words = trLower([it.title, it.note].join(" ")).replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/)
+    .filter(w => w.length >= 5 && !STOP.has(w) && !/^\d+$/.test(w) && !have.has(w));
+  for (const w of words) { if (add.length >= 3) break; if (!add.includes(w)) add.push(w); }
+  if (!add.length) return;
+  c.kw = [...have, ...add].slice(-60).join(",");
+  try { await saveCats(); } catch {}
 }
 
 /* ---------- Kaydet ---------- */
@@ -385,6 +510,10 @@ $("#btnSave").onclick = async () => {
     };
     if (!url) it.note = it.note || (raw.length > 140 ? raw : "");
     let catMsg = "";
+    if (url && !userTitle) {
+      const ft = await fetchTitle(url);
+      if (ft) it.title = ft.title + (ft.author ? " · " + ft.author : "");
+    }
     if (it.cat === "__auto") {
       it.auto = true;
       const ai = await aiCategorize({ ...it, title: userTitle || raw.replace(url, "").trim() || it.title });
@@ -539,7 +668,8 @@ function openConfirm(msg, onYes) {
 function openCatPicker(it) {
   openSheet(`<h3>Kategori seç</h3>${S.cats.map(c => `<button class="opt ${c.id === it.cat ? "on" : ""}" data-pick="${esc(c.id)}"><span style="font-size:20px">${esc(c.emoji)}</span>${esc(c.name)}</button>`).join("")}`);
   $("#sheet").querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
-    closeSheet(); await saveItem({ ...it, cat: b.dataset.pick, auto: false }); toast("Kategori değişti");
+    closeSheet(); await saveItem({ ...it, cat: b.dataset.pick, auto: false });
+    if (b.dataset.pick !== it.cat) { learnFrom(it, b.dataset.pick); toast("Kategori değişti · bir dahakine hatırlayacak"); } else toast("Kategori aynı");
   });
 }
 
@@ -556,7 +686,7 @@ function openEdit(it) {
   $("#eS").onclick = async () => {
     const url = $("#eU").value.trim();
     const n = { ...it, title: $("#eT").value.trim(), url, note: $("#eN").value.trim(), cat: $("#eC").value, platform: platformOf(url).k };
-    if (n.cat !== it.cat) n.auto = false;
+    if (n.cat !== it.cat) { n.auto = false; learnFrom(n, n.cat); }
     closeSheet(); try { await saveItem(n); toast("Güncellendi"); } catch { toast("Kaydedilemedi"); }
   };
 }

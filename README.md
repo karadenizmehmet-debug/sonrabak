@@ -7,6 +7,9 @@
 ## Özellikler
 - Link veya metin yapıştırıp kaydetme
 - Otomatik kategori (platform + anahtar kelime) veya elle seçim
+- 🤖 Akıllı kategori: kendi Google Gemini (ücretsiz) veya Claude API anahtarınla. Anahtar yalnızca telefonda saklanır, repoya girmez.
+- Düzelttikçe öğrenir: kategori değiştirdiğinde başlıktaki kelimeleri ve siteyi o kategoriye ekler
+- YouTube/Vimeo linklerinde gerçek başlığı otomatik getirir
 - Kategori ekleme, silme, sıralama, anahtar kelime düzenleme
 - Arama, "Bakılmadı" ve yıldız filtresi
 - Android'de telefonun **Paylaş** menüsünden doğrudan kaydetme (uygulama ana ekrana eklendiyse)
