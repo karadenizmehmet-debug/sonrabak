@@ -88,8 +88,8 @@ main{max-width:720px;margin:0 auto;padding:12px 14px 110px}
 .ib:active{background:var(--chip)}
 .empty{text-align:center;color:var(--muted);padding:34px 10px}
 .empty .big{font-size:40px}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(80px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px;transition:.25s;z-index:60;max-width:90vw;text-align:center}
-.toast.show{transform:translateX(-50%) translateY(0)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(16px);opacity:0;pointer-events:none;visibility:hidden;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px;transition:opacity .2s,transform .2s,visibility 0s .2s;z-index:60;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto;visibility:visible;transition:opacity .2s,transform .2s}
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:40;display:none;align-items:flex-end;justify-content:center}
 .sheet-bg.open{display:flex}
 .sheet{background:var(--card);width:100%;max-width:720px;border-radius:20px 20px 0 0;padding:16px 16px 26px;max-height:88vh;overflow:auto}
@@ -111,7 +111,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 </head>
 <body>
 <header>
-  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.4.1</span></div>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.4.2</span></div>
   <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
   <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
   <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
@@ -162,7 +162,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
 <script>
 (() => {
-const VERSION = "1.4.1";
+const VERSION = "1.4.2";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -317,7 +317,11 @@ $("#btnShare").onclick = async () => {
 
 /* ---------- Toast ---------- */
 let tt;
-function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2400); }
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(tt);
+  tt = setTimeout(() => t.classList.remove("show"), Math.min(6000, 2200 + msg.length * 35));
+}
+$("#toast").addEventListener("click", () => { clearTimeout(tt); $("#toast").classList.remove("show"); });
 
 /* ---------- Depolama ---------- */
 async function saveItem(it) {
@@ -471,8 +475,14 @@ function parseJsonLoose(text) {
   return JSON.parse(m[0]);
 }
 
+// İstek başına ayrı süre sınırı
+async function fetchT(url, opts, ms) {
+  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(url, { ...opts, signal: ctl.signal }); }
+  catch (e) { if (e.name === "AbortError") { const x = new Error("Zaman aşımı"); x.timeout = true; throw x; } throw e; }
+  finally { clearTimeout(to); }
+}
 async function callProvider(conf, prompt, { web = false } = {}) {
-  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), web ? 30000 : 20000);
   try {
     if (conf.provider === "gemini") {
       let model = conf.model || MODEL_DEF.gemini;
@@ -481,11 +491,11 @@ async function callProvider(conf, prompt, { web = false } = {}) {
         const body = useWeb
           ? { contents: [{ parts: [{ text: prompt }] }], tools: [{ url_context: {} }], generationConfig: { temperature: 0.2 } }
           : { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } };
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-          method: "POST", signal: ctl.signal,
+        const r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+          method: "POST",
           headers: { "content-type": "application/json", "x-goog-api-key": conf.key },
           body: JSON.stringify(body)
-        });
+        }, useWeb ? 15000 : 20000);
         const j = await r.json().catch(() => ({}));
         if (!r.ok) { const e = new Error(j.error?.message || "Gemini hata " + r.status); e.status = r.status; throw e; }
         return parseJsonLoose(j.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "");
@@ -493,12 +503,13 @@ async function callProvider(conf, prompt, { web = false } = {}) {
       const once = async () => {
         if (!web) return await ask(false);
         try { return await ask(true); }
-        catch (e) { if (e.status === 429 || e.status === 401 || e.status === 403 || e.status === 404) throw e; return await ask(false); }
+        catch (e) { if (e.status === 429 || e.status === 401 || e.status === 403 || e.status === 404) throw e; return await ask(false); } // sayfa okuma yavaşsa/hatalıysa okumadan dene
       };
       // önce en son çalışan model, sonra yazılan model, sonra yedekler
       const order = [...new Set([geminiWorking, model, ...GEMINI_FALLBACK].filter(Boolean))];
-      let lastErr;
+      let lastErr, tries = 0;
       for (const m of order) {
+        if (++tries > 3) break; // en fazla 3 model dene, kullanıcı çok beklemesin
         model = m;
         try {
           const out = await once();
@@ -507,27 +518,26 @@ async function callProvider(conf, prompt, { web = false } = {}) {
         } catch (e) {
           lastErr = e;
           const msg = String(e.message || "");
-          const modelProblem = e.status === 404 || e.status === 429 || /not found|not supported|is not available|quota|exhausted|deprecated|shut down/i.test(msg);
-          if (!modelProblem || e.name === "AbortError") throw e; // anahtar hatası vb.: başka model denemek boşuna
+          const modelProblem = e.timeout || e.status === 404 || e.status === 429 || e.status >= 500 || /not found|not supported|is not available|quota|exhausted|deprecated|shut down|overloaded/i.test(msg);
+          if (!modelProblem) throw e; // anahtar hatası vb.: başka model denemek boşuna
         }
       }
       throw lastErr;
     }
     if (conf.provider === "claude") {
-      const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", signal: ctl.signal,
+      const r = await fetchT("https://api.anthropic.com/v1/messages", {
+        method: "POST",
         headers: { "content-type": "application/json", "x-api-key": conf.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
         body: JSON.stringify({ model: conf.model || MODEL_DEF.claude, max_tokens: 300, messages: [{ role: "user", content: prompt }] })
-      });
+      }, 25000);
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error?.message || "Claude hata " + r.status);
       return parseJsonLoose((j.content || []).map(c => c.text || "").join(""));
     }
     return null;
   } catch (e) {
-    if (e.name === "AbortError") throw new Error("Zaman aşımı");
     throw e;
-  } finally { clearTimeout(to); }
+  }
 }
 
 /* ---------- Sayfa bilgisi (başlık/açıklama) ---------- */
@@ -690,6 +700,24 @@ async function enrich(it, { recat = false, userTitle = "", userText = "" } = {})
   return { it, catMsg, aiOk };
 }
 
+// Kaydı arkada düzenle; bu sırada kullanıcı başka kayıt ekleyebilir
+async function enrichInBackground(orig, opts) {
+  const copy = { ...orig }; delete copy.pending;
+  let res;
+  try { res = await enrich(copy, opts); } catch { res = { catMsg: "", aiOk: false }; }
+  const cur = S.items.find(x => x.id === orig.id);
+  if (!cur) return; // bu arada silindi
+  const merged = { ...cur, title: copy.title, ozet: copy.ozet, tur: copy.tur, desc: copy.desc, author: copy.author, ai: copy.ai };
+  // kullanıcı bu arada kategoriyi elle değiştirdiyse ona dokunma
+  if (cur.cat === orig.cat) { merged.cat = copy.cat; merged.auto = copy.auto; }
+  delete merged.pending;
+  for (const k of Object.keys(merged)) if (merged[k] === undefined) delete merged[k];
+  try { await saveItem(merged); } catch { return; }
+  const c = catById(merged.cat);
+  const warn = hasAI() && !res.aiOk ? " · ⚠️ yapay zekâ: " + (lastAiError || "cevap yok").slice(0, 40) : "";
+  toast(`${c.emoji} ${pathName(merged.cat)}${res.catMsg}${warn}`);
+}
+
 /* ---------- Başlık önerisi (mevcut kayıtlar için) ---------- */
 async function suggestTitle(it) {
   const copy = { ...it };
@@ -750,12 +778,14 @@ $("#btnSave").onclick = async () => {
     if (!url) it.note = it.note || (raw.length > 140 ? raw : "");
     const userText = userTitle || raw.replace(url, "").trim();
     const auto = it.cat === "__auto";
-    if (auto) it.cat = "diger";
-    const { catMsg, aiOk } = await enrich(it, { recat: auto, userTitle, userText });
+    if (auto) { it.cat = ruleCategory(it); it.auto = true; }
+    const willEnrich = !!url || hasAI();
+    if (willEnrich) it.pending = true;
     await saveItem(it);
-    const c = catById(it.cat);
-    toast(`${c.emoji} ${pathName(it.cat)} içine kaydedildi${catMsg}` + (hasAI() && !aiOk ? " · ⚠️ yapay zekâ cevap vermedi: " + lastAiError.slice(0, 60) : ""));
+    toast(willEnrich ? "Kaydedildi · düzenleniyor…" : `${catById(it.cat).emoji} ${pathName(it.cat)} içine kaydedildi`);
     $("#inUrl").value = ""; $("#inTitle").value = ""; $("#inNote").value = ""; $("#more").classList.remove("open");
+    btn.disabled = false; btn.textContent = "Kaydet";
+    if (willEnrich) enrichInBackground(it, { recat: auto, userTitle, userText });
   } catch (e) {
     toast(e && e.code === "quota_exceeded" ? "Depolama dolu, eski kayıtları sil" : "Kaydedilemedi, tekrar dene");
   } finally { btn.disabled = false; btn.textContent = "Kaydet"; }
@@ -867,7 +897,7 @@ function itemHTML(i) {
   return `<div class="item ${i.read ? "read" : ""}" data-id="${esc(i.id)}">
     <div class="pf" style="background:${p.bg}">${p.ic}</div>
     <div class="body">
-      ${i.tur ? `<div class="tur">${esc(i.tur)}</div>` : ""}
+      ${i.pending && Date.now() - i.created < 120000 ? `<div class="tur"><span class="spin" style="width:10px;height:10px;border-width:1.5px"></span> düzenleniyor…</div>` : i.tur ? `<div class="tur">${esc(i.tur)}</div>` : ""}
       ${titleEl}
       <div class="meta">
         <button class="chipb" data-act="cat">${esc(c.emoji)} ${esc(pathName(i.cat))}${i.auto ? " 🤖" : ""}</button>

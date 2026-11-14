@@ -1,5 +1,5 @@
 // Sonra Bak service worker — © Mehmet Karadeniz, 2026-2027
-const CACHE = "sonrabak-v1.4.1";
+const CACHE = "sonrabak-v1.4.2";
 const FILES = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
