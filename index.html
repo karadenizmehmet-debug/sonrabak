@@ -111,7 +111,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 </head>
 <body>
 <header>
-  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.4</span></div>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.4.1</span></div>
   <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
   <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
   <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
@@ -162,7 +162,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
 <script>
 (() => {
-const VERSION = "1.4";
+const VERSION = "1.4.1";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -391,8 +391,12 @@ async function initCloud() {
 
 /* ---------- Yapay zekâ ayarları ---------- */
 const AI_DEF = { provider: "off", key: "", model: "" };
-const MODEL_DEF = { gemini: "gemini-2.5-flash", claude: "claude-haiku-5-5" };
+const MODEL_DEF = { gemini: "gemini-flash-latest", claude: "claude-haiku-5-5" };
+// Model bulunamazsa ya da kotası dolarsa sırayla bunlar denenir (ücretsiz kota model başına ayrı)
+const GEMINI_FALLBACK = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite"];
+let geminiWorking = LS.get("geminiWorking", "");
 let AI = { ...AI_DEF, ...LS.get("aiConf", {}) };
+if (AI.provider === "gemini" && (!AI.model || AI.model === "gemini-2.5-flash")) { AI.model = MODEL_DEF.gemini; LS.set("aiConf", AI); }
 
 function aiLabel() {
   if (sample && AI.provider === "off") return "Claude (bu sayfa)";
@@ -434,7 +438,7 @@ $("#aiWrap").onclick = () => {
     const pv = $("#aP").value;
     $("#aBox").style.display = pv === "off" ? "none" : "flex";
     $("#aT").style.display = pv === "off" ? "none" : "";
-    if (!$("#aM").value || Object.values(MODEL_DEF).includes($("#aM").value)) $("#aM").value = MODEL_DEF[pv] || "";
+    if (!$("#aM").value || Object.values(MODEL_DEF).includes($("#aM").value) || $("#aM").value === "gemini-2.5-flash") $("#aM").value = MODEL_DEF[pv] || "";
     $("#aHelp").innerHTML = pv === "gemini"
       ? 'Anahtar al: <a class="lnk" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> → "Create API key". Ücretsiz katmanda Google gönderilen metni ürün geliştirmede kullanabilir; yalnızca link, başlık ve not gönderilir.'
       : pv === "claude"
@@ -451,7 +455,7 @@ $("#aiWrap").onclick = () => {
     $("#aRes").innerHTML = '<span class="spin"></span> Deneniyor…';
     try {
       const r = await callProvider(conf, 'Yalnızca şu JSON\'u döndür: {"tamam":true}');
-      $("#aRes").innerHTML = r && r.tamam ? '<span style="color:var(--ok)">✔ Çalışıyor</span>' : "Cevap geldi ama beklenen biçimde değil.";
+      $("#aRes").innerHTML = r && r.tamam ? '<span style="color:var(--ok)">✔ Çalışıyor' + (conf.provider === "gemini" && geminiWorking ? " · model: " + esc(geminiWorking) : "") + '</span>' : "Cevap geldi ama beklenen biçimde değil.";
     } catch (e) { $("#aRes").innerHTML = '<span style="color:var(--acc)">✖ ' + esc(e.message || "Hata") + "</span>"; }
   };
   if ($("#aFix")) $("#aFix").onclick = () => { AI = read(); LS.set("aiConf", AI); refreshAiState(); const b = $("#aFix"); if (AI.provider === "off" && !sample) { toast("Önce bir sağlayıcı seç"); return; } b.disabled = true; reprocessAll(b); };
@@ -471,12 +475,13 @@ async function callProvider(conf, prompt, { web = false } = {}) {
   const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), web ? 30000 : 20000);
   try {
     if (conf.provider === "gemini") {
+      let model = conf.model || MODEL_DEF.gemini;
       const ask = async useWeb => {
         // useWeb: Gemini linkteki sayfayı kendisi açıp okur (url_context). Bu modda JSON modu kullanılamıyor.
         const body = useWeb
           ? { contents: [{ parts: [{ text: prompt }] }], tools: [{ url_context: {} }], generationConfig: { temperature: 0.2 } }
           : { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } };
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(conf.model || MODEL_DEF.gemini)}:generateContent`, {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
           method: "POST", signal: ctl.signal,
           headers: { "content-type": "application/json", "x-goog-api-key": conf.key },
           body: JSON.stringify(body)
@@ -485,9 +490,28 @@ async function callProvider(conf, prompt, { web = false } = {}) {
         if (!r.ok) { const e = new Error(j.error?.message || "Gemini hata " + r.status); e.status = r.status; throw e; }
         return parseJsonLoose(j.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "");
       };
-      if (!web) return await ask(false);
-      try { return await ask(true); }
-      catch (e) { if (e.status === 429 || e.status === 401 || e.status === 403) throw e; return await ask(false); }
+      const once = async () => {
+        if (!web) return await ask(false);
+        try { return await ask(true); }
+        catch (e) { if (e.status === 429 || e.status === 401 || e.status === 403 || e.status === 404) throw e; return await ask(false); }
+      };
+      // önce en son çalışan model, sonra yazılan model, sonra yedekler
+      const order = [...new Set([geminiWorking, model, ...GEMINI_FALLBACK].filter(Boolean))];
+      let lastErr;
+      for (const m of order) {
+        model = m;
+        try {
+          const out = await once();
+          if (geminiWorking !== m) { geminiWorking = m; LS.set("geminiWorking", m); }
+          return out;
+        } catch (e) {
+          lastErr = e;
+          const msg = String(e.message || "");
+          const modelProblem = e.status === 404 || e.status === 429 || /not found|not supported|is not available|quota|exhausted|deprecated|shut down/i.test(msg);
+          if (!modelProblem || e.name === "AbortError") throw e; // anahtar hatası vb.: başka model denemek boşuna
+        }
+      }
+      throw lastErr;
     }
     if (conf.provider === "claude") {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
