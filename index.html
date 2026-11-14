@@ -117,7 +117,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 </head>
 <body>
 <header>
-  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.5.1</span></div>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.5.2</span></div>
   <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
   <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
   <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
@@ -168,7 +168,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
 <script>
 (() => {
-const VERSION = "1.5.1";
+const VERSION = "1.5.2";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -201,7 +201,7 @@ const DEFAULT_CATS = [
 /* ---------- Platform tespiti ---------- */
 const PLATFORMS = [
   {k:"youtube",  re:/(youtube\.com|youtu\.be)/i, label:"YouTube",   ic:"▶", bg:"#ff0033", cat:"video"},
-  {k:"instagram",re:/instagram\.com/i,           label:"Instagram", ic:"◎", bg:"linear-gradient(135deg,#f9a03f,#e1306c,#833ab4)", cat:"ilham"},
+  {k:"instagram",re:/instagram\.com/i,           label:"Instagram", ic:"◎", bg:"linear-gradient(135deg,#f9a03f,#e1306c,#833ab4)", cat:null},
   {k:"tiktok",   re:/tiktok\.com/i,              label:"TikTok",    ic:"♪", bg:"#111", cat:"video"},
   {k:"x",        re:/(twitter\.com|\/\/x\.com|\.x\.com)/i, label:"X", ic:"𝕏", bg:"#000", cat:"haber"},
   {k:"facebook", re:/(facebook\.com|fb\.watch)/i,label:"Facebook",  ic:"f", bg:"#1877f2", cat:null},
@@ -756,10 +756,10 @@ async function enrichInBackground(orig, opts) {
 }
 
 /* ---------- Başlık önerisi (mevcut kayıtlar için) ---------- */
-async function suggestTitle(it) {
+async function suggestTitle(it, { recat = false } = {}) {
   const copy = { ...it };
-  const { aiOk } = await enrich(copy, { recat: false });
-  return !isGenericTitle(copy.title, copy.url) || aiOk ? { title: copy.title, ozet: copy.ozet || "", desc: copy.desc || "", tur: copy.tur || "", tags: copy.tags || [] } : null;
+  const { aiOk } = await enrich(copy, { recat });
+  return !isGenericTitle(copy.title, copy.url) || aiOk ? { title: copy.title, ozet: copy.ozet || "", desc: copy.desc || "", tur: copy.tur || "", tags: copy.tags || [], cat: aiOk && recat ? copy.cat : null } : null;
 }
 const needsAI = i => (!i.ai || !(i.tags && i.tags.length)) && (i.url || i.note);
 async function reprocessAll(btn) {
@@ -1027,7 +1027,7 @@ function openCatPicker(it) {
 function openEdit(it) {
   openSheet(`<h3>Kaydı düzenle</h3>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <div class="row" style="flex-wrap:nowrap"><input class="field" id="eT" value="${esc(it.title)}" placeholder="Başlık" style="flex:1"><button class="btn sm" id="eAI" title="Başlığı otomatik yaz">✨</button></div>
+      <div class="row" style="flex-wrap:nowrap"><input class="field" id="eT" value="${esc(it.title)}" placeholder="Başlık" style="flex:1"><button class="btn sm" id="eAI" title="Başlık, özet, etiket ve kategoriyi yapay zekâ yazsın">✨</button></div>
       <input class="field" id="eU" value="${esc(it.url)}" placeholder="Link">
       <textarea class="field" id="eN" rows="3" placeholder="Not">${esc(it.note)}</textarea>
       <input class="field" id="eG" value="${esc((it.tags || []).join(", "))}" placeholder="Etiketler (virgülle): pardus, kablosuz, ekran yansıtma">
@@ -1037,9 +1037,10 @@ function openEdit(it) {
   $("#eX").onclick = closeSheet;
   $("#eAI").onclick = async () => {
     const b = $("#eAI"); b.disabled = true; b.innerHTML = '<span class="spin"></span>';
-    const r = await suggestTitle({ ...it, url: $("#eU").value.trim() });
+    const r = await suggestTitle({ ...it, url: $("#eU").value.trim() }, { recat: true });
     b.disabled = false; b.textContent = "✨";
-    if (r) { $("#eT").value = r.title; it.ozet = r.ozet || it.ozet; it.desc = r.desc || it.desc; it.tur = r.tur || it.tur; it.ai = true; if (r.tags.length) $("#eG").value = r.tags.join(", "); }
+    if (r) { $("#eT").value = r.title; it.ozet = r.ozet || it.ozet; it.desc = r.desc || it.desc; it.tur = r.tur || it.tur; it.ai = true; if (r.tags.length) $("#eG").value = r.tags.join(", ");
+      if (r.cat) { $("#eC").innerHTML = catOptions(r.cat); $("#eC").value = r.cat; if (r.cat !== it.cat) toast("Önerilen kategori: " + pathName(r.cat) + " · Kaydet'e bas"); } }
     else toast(hasAI() ? "Başlık bulunamadı" : "Sayfa başlığı alınamadı · akıllı kategoriyi açarsan yapay zekâ yazar");
   };
   $("#eS").onclick = async () => {
