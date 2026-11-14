@@ -53,6 +53,8 @@ main{max-width:720px;margin:0 auto;padding:12px 14px 110px}
 .crow2{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;text-align:left;border-bottom:1px solid var(--line)}
 .crow2:last-child{border-bottom:0}
 .crow2:active{background:var(--chip)}
+.pf.sm{width:30px;height:30px;font-size:15px;border-radius:9px}
+.chead .pf{width:42px;height:42px;font-size:20px}
 .crow2 .e{font-size:22px;width:30px;text-align:center;flex:none}
 .crow2 .n{flex:1;min-width:0}
 .crow2 .n b{display:block;font-weight:650}
@@ -117,7 +119,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 </head>
 <body>
 <header>
-  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.5.3</span></div>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.6</span></div>
   <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
   <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
   <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
@@ -148,6 +150,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
   <div class="sec">
     <h2 id="listTitle">Son kaydedilenler</h2>
     <div class="filters">
+      <select class="f" id="srcSel" style="display:none;border:0"></select>
       <button class="f on" data-f="all">Tümü</button>
       <button class="f" data-f="unread">Bakılmadı</button>
       <button class="f" data-f="fav">⭐</button>
@@ -169,7 +172,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
 <script>
 (() => {
-const VERSION = "1.5.3";
+const VERSION = "1.6";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -255,7 +258,7 @@ function guessTitle(url, text) {
 }
 
 /* ---------- Durum ---------- */
-const S = { items: [], cats: DEFAULT_CATS.map(c => ({...c})), sel: "home", filter: "all", q: "", mode: "local" };
+const S = { items: [], cats: DEFAULT_CATS.map(c => ({...c})), sel: "home", filter: "all", q: "", src: "", mode: "local" };
 let db = null, uidv = null, itemsCol = null, catsDoc = null, sample = null;
 
 const LS = {
@@ -850,7 +853,7 @@ $("#inUrl").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shift
 
 /* ---------- Gezinme (geri tuşu çalışsın diye #adres) ---------- */
 function go(sel) {
-  const h = sel === "home" ? "" : "#" + (sel === "all" ? "tumu" : "k-" + sel);
+  const h = sel === "home" ? "" : "#" + (sel === "all" ? "tumu" : sel.startsWith("src:") ? "s-" + sel.slice(4) : "k-" + sel);
   if (location.hash !== h) {
     if (h) location.hash = h; else history.pushState(null, "", location.pathname + location.search);
   }
@@ -858,7 +861,7 @@ function go(sel) {
 }
 function applyHash() {
   const h = decodeURIComponent(location.hash.slice(1));
-  S.sel = h === "tumu" ? "all" : h.startsWith("k-") && S.cats.some(c => c.id === h.slice(2)) ? h.slice(2) : "home";
+  S.sel = h === "tumu" ? "all" : h.startsWith("s-") ? "src:" + h.slice(2) : h.startsWith("k-") && S.cats.some(c => c.id === h.slice(2)) ? h.slice(2) : "home";
   render(); window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", applyHash);
@@ -891,8 +894,14 @@ function catRow(c) {
     <span class="cnt">${n}</span><span class="ch">›</span></button>`;
 }
 
+function srcCounts(list) {
+  const m = new Map();
+  for (const i of list) { const k = i.platform || "text"; m.set(k, (m.get(k) || 0) + 1); }
+  return [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
 function render() {
-  if (S.sel !== "home" && S.sel !== "all" && !S.cats.some(c => c.id === S.sel)) S.sel = "home";
+  const isSrc = S.sel.startsWith("src:"), srcKey = isSrc ? S.sel.slice(4) : "";
+  if (S.sel !== "home" && S.sel !== "all" && !isSrc && !S.cats.some(c => c.id === S.sel)) S.sel = "home";
 
   // kaydet kutusundaki seçim
   const sel = $("#inCat"), prev = sel.value || "__auto";
@@ -905,7 +914,15 @@ function render() {
     if (S.sel === "home") {
       nav = `<div class="sec"><h2>Kategoriler</h2><button class="lnk" data-newcat="">＋ Yeni</button></div>
         <div class="clist">${childrenOf(null).map(catRow).join("")}
-        <button class="crow2" data-go="all"><span class="e">📚</span><span class="n"><b>Tüm kayıtlar</b></span><span class="cnt">${S.items.length}</span><span class="ch">›</span></button></div>`;
+        <button class="crow2" data-go="all"><span class="e">📚</span><span class="n"><b>Tüm kayıtlar</b></span><span class="cnt">${S.items.length}</span><span class="ch">›</span></button></div>
+        ${(() => { const rows = srcCounts(S.items); if (!rows.length) return "";
+          return `<div class="sec"><h2>Kaynaklar</h2></div><div class="clist">${rows.map(([k, n]) => { const p = pByKey(k);
+            const doms = k === "web" ? [...new Set(S.items.filter(i => i.platform === "web").map(i => domainOf(i.url)))].slice(0, 3).join(", ") : "";
+            return `<button class="crow2" data-go="src:${k}"><span class="pf sm" style="background:${p.bg}">${p.ic}</span><span class="n"><b>${esc(p.k === "web" ? "Web siteleri" : p.k === "text" ? "Notlar" : p.label)}</b>${doms ? `<small>${esc(doms)}</small>` : ""}</span><span class="cnt">${n}</span><span class="ch">›</span></button>`; }).join("")}</div>`; })()}`;
+    } else if (isSrc) {
+      const p = pByKey(srcKey);
+      nav = `<div class="crumb"><button data-go="home">🏠 Ana sayfa</button></div>
+        <div class="chead"><span class="pf" style="background:${p.bg}">${p.ic}</span><h1>${esc(p.k === "web" ? "Web siteleri" : p.k === "text" ? "Notlar" : p.label)}</h1></div>`;
     } else if (S.sel !== "all") {
       const c = catById(S.sel), anc = ancestors(S.sel), subs = childrenOf(S.sel);
       nav = `<div class="crumb"><button data-go="home">🏠 Ana sayfa</button>${anc.slice(0, -1).map(a => `<span>›</span><button data-go="${esc(a.id)}">${esc(a.name)}</button>`).join("")}</div>
@@ -921,7 +938,15 @@ function render() {
 
   // liste
   let arr = S.items.slice();
-  if (S.sel !== "home" && S.sel !== "all") { const ids = descendantIds(S.sel); arr = arr.filter(i => ids.has(i.cat)); }
+  if (isSrc) arr = arr.filter(i => (i.platform || "text") === srcKey);
+  else if (S.sel !== "home" && S.sel !== "all") { const ids = descendantIds(S.sel); arr = arr.filter(i => ids.has(i.cat)); }
+  // kategori sayfasında kaynak süzgeci
+  const srcSel = $("#srcSel"), avail = srcCounts(arr);
+  srcSel.style.display = !isSrc && S.sel !== "home" && !S.q && avail.length > 1 ? "" : "none";
+  srcSel.innerHTML = `<option value="">Kaynak: tümü</option>` + avail.map(([k, n]) => `<option value="${k}">${esc(pByKey(k).label)} (${n})</option>`).join("");
+  if (!avail.some(([k]) => k === S.src)) S.src = "";
+  srcSel.value = S.src;
+  if (S.src && !isSrc && S.sel !== "home") arr = arr.filter(i => (i.platform || "text") === S.src);
   if (S.filter === "unread") arr = arr.filter(i => !i.read);
   if (S.filter === "fav") arr = arr.filter(i => i.fav);
   if (S.q) {
@@ -933,7 +958,8 @@ function render() {
 
   $("#listTitle").textContent = S.q ? `“${S.q}” için ${arr.length} sonuç`
     : showHome ? "Son kaydedilenler"
-    : S.sel === "all" ? "Tüm kayıtlar"
+    : S.sel === "all" ? "Tüm kayıtlar (" + arr.length + ")"
+    : isSrc ? "Kayıtlar (" + arr.length + ")"
     : "Kayıtlar (" + arr.length + ")";
 
   $("#list").innerHTML = arr.length ? arr.map(itemHTML).join("") :
@@ -984,7 +1010,7 @@ function itemHTML(i) {
 document.addEventListener("click", async e => {
   if (e.target.closest("#sheet")) return; // alt sayfa kendi düğmelerini yönetir
   const g = e.target.closest("[data-go]");
-  if (g) { S.q = ""; $("#q").value = ""; go(g.dataset.go); return; }
+  if (g) { S.q = ""; $("#q").value = ""; S.src = ""; go(g.dataset.go); return; }
   const nc = e.target.closest("[data-newcat]");
   if (nc) { openCatEdit(null, nc.dataset.newcat || null); return; }
   const ec = e.target.closest("[data-editcat]");
@@ -1016,6 +1042,7 @@ document.addEventListener("click", async e => {
   } catch { toast("İşlem yapılamadı"); }
 });
 
+$("#srcSel").onchange = e => { S.src = e.target.value; render(); };
 let qt;
 $("#q").addEventListener("input", e => { clearTimeout(qt); qt = setTimeout(() => { S.q = e.target.value.trim(); render(); }, 150); });
 
