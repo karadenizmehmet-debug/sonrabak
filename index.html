@@ -79,6 +79,8 @@ main{max-width:720px;margin:0 auto;padding:12px 14px 110px}
 .t{font-weight:650;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:inherit;text-decoration:none}
 .meta{color:var(--muted);font-size:12.5px;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .tur{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--acc);margin-bottom:2px}
+.tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.tag{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--acc2);color:var(--acc);font-weight:600}
 .sum.ai{color:var(--ink);opacity:.85}
 .sum{font-size:13px;color:var(--muted);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .note{font-size:13.5px;margin-top:5px;background:var(--bg);border-radius:8px;padding:6px 8px;white-space:pre-wrap;word-break:break-word}
@@ -111,7 +113,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 </head>
 <body>
 <header>
-  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.4.3</span></div>
+  <div class="logo">Sonra Bak<span class="dot">.</span><span class="ver">v1.5</span></div>
   <button class="hbtn" id="btnCats" title="Kategorileri düzenle">🗂️</button>
   <button class="hbtn" id="btnTheme" title="Gece / gündüz">🌙</button>
   <button class="hbtn" id="btnShare" title="Paylaş">📤</button>
@@ -135,7 +137,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
     </div>
   </section>
 
-  <div class="search"><input id="q" type="search" placeholder="Kayıtlarda ara…"></div>
+  <div class="search"><input id="q" type="search" placeholder="Ara: başlık, etiket, özet…"></div>
 
   <div id="nav"></div>
 
@@ -162,7 +164,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:10px}
 
 <script>
 (() => {
-const VERSION = "1.4.3";
+const VERSION = "1.5";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -279,7 +281,7 @@ function fixCats(list) {
 // Yalnızca bir kategorinin alt kategorileri arasında anahtar kelimeyle seç (bulamazsa null)
 function ruleWithin(item, parentId) {
   const ids = descendantIds(parentId); ids.delete(parentId);
-  const hay = " " + fold([item.url, item.title, item.ozet, item.desc, item.note].join(" ")) + " ";
+  const hay = " " + fold([item.url, item.title, item.ozet, (item.tags || []).join(" "), item.desc, item.note].join(" ")) + " ";
   let best = null, bestScore = 0;
   for (const c of S.cats) {
     if (!ids.has(c.id)) continue;
@@ -293,7 +295,7 @@ function ruleWithin(item, parentId) {
   return best;
 }
 function ruleCategory(item) {
-  const hay = " " + fold([item.url, item.title, item.ozet, item.desc, item.note].join(" ")) + " ";
+  const hay = " " + fold([item.url, item.title, item.ozet, (item.tags || []).join(" "), item.desc, item.note].join(" ")) + " ";
   let best = null, bestScore = 0;
   for (const c of S.cats) {
     const kws = (c.kw || "").split(",").map(s => fold(s.trim()).trim()).filter(Boolean);
@@ -449,7 +451,7 @@ $("#aiWrap").onclick = () => {
       <div id="aRes" style="font-size:13px"></div>
       ${lastAiError ? `<div style="font-size:12.5px;color:var(--acc)">Son hata: ${esc(lastAiError.slice(0, 160))}</div>` : ""}
       ${(() => { const n = S.items.filter(needsAI).length;
-        return n ? `<button class="btn sm" id="aFix">✨ ${n} kaydı yapay zekâyla düzenle (Türkçe başlık, özet, kategori)</button>` : ""; })()}
+        return n ? `<button class="btn sm" id="aFix">✨ ${n} kaydı yapay zekâyla düzenle (Türkçe başlık, özet, etiket, kategori)</button>` : ""; })()}
       <div class="row" style="justify-content:flex-end">
         <button class="btn" id="aT">Dene</button><button class="btn pri" id="aS">Kaydet</button>
       </div>
@@ -613,14 +615,15 @@ Sayfa içeriğinden bölüm: ${pageText ? pageText : "-"}`;
   const titleRules = `- HER ŞEYİ TÜRKÇE YAZ. İçerik İngilizce ya da başka dildeyse Türkçeye çevirerek anlat; özel adları (program, marka, kişi) olduğu gibi bırak.
 - "baslik": İçeriğin NE OLDUĞUNU ilk bakışta anlatan 3-8 kelimelik Türkçe başlık (ör. "Ditto – Windows için pano geçmişi programı", "Pardus'ta yazıcı kurulumu", "Fırında karnıyarık tarifi"). ASLA adres, alan adı, kullanıcı adı ya da "Instagram gönderisi", "YouTube videosu" gibi genel ifade yazma. Bilgi azsa en makul tahmini yaz.
 - "ozet": Ne işe yaradığını / ne anlattığını söyleyen tek Türkçe cümle, en fazla 20 kelime.
-- "tur": İçeriğin türü, 1-2 kelime Türkçe (ör. Program, Uygulama, Tarif, Video ders, Makale, Haber, Ürün, Kod deposu, İpucu, Etkinlik).`;
+- "tur": İçeriğin türü, 1-2 kelime Türkçe (ör. Program, Uygulama, Tarif, Video ders, Makale, Haber, Ürün, Kod deposu, İpucu, Etkinlik).
+- "etiketler": 6-12 kısa Türkçe etiket, küçük harfle. İçerikteki ana kavramlar + kişinin bunu sonra ararken yazabileceği eş anlamlı ve ilgili kelimeler (ör. Pardus'ta ekran yansıtma → ["pardus","ekran yansıtma","kablosuz","kablosuz ekran","miracast","ekran paylaşımı","etkileşimli tahta","linux"]). Program/marka adlarını da ekle.`;
   if (titleOnly) {
     const p2 = `Bir "sonra bak" uygulamasında kaydedilen içeriğe anlaşılır bir Türkçe başlık yazıyorsun.${web ? " Linkteki sayfayı açıp okuyabiliyorsan oku; açamıyorsan aşağıdaki bilgiye bak." : " İnternete erişimin yok; yalnızca aşağıdaki bilgiye bak."}
 
 ${info}
 
 Yalnızca şu JSON'u döndür, başka hiçbir şey yazma:
-{"baslik":"<başlık>","ozet":"<tek cümle>","tur":"<tür>"}
+{"baslik":"<başlık>","ozet":"<tek cümle>","tur":"<tür>","etiketler":["<etiket>"]}
 ${titleRules}`;
     try { lastAiError = ""; return useSample ? await sample.json(p2, { modelTier: "quick" }) : await callProvider(AI, p2, { web }); }
     catch (e) { lastAiError = e?.message || "hata"; return null; }
@@ -637,7 +640,7 @@ ${tree}
 ${info}
 
 Yalnızca şu JSON'u döndür, başka hiçbir şey yazma:
-{"yol":["<üst kategori adı>","<alt kategori adı>"],"emoji":"<tek emoji>","baslik":"<başlık>","ozet":"<tek cümle>","tur":"<tür>"}
+{"yol":["<üst kategori adı>","<alt kategori adı>"],"emoji":"<tek emoji>","baslik":"<başlık>","ozet":"<tek cümle>","tur":"<tür>","etiketler":["<etiket>"]}
 
 Kurallar:
 - "yol" kökten başlayan kategori adları listesidir, en fazla 2 seviye. Mevcut bir kategoriyi seçiyorsan adını AYNEN yaz.
@@ -685,6 +688,15 @@ function resolvePath(names, emoji, allowNew) {
   return { id, created };
 }
 
+function cleanTags(arr) {
+  const out = [];
+  for (const t of arr || []) {
+    const v = trLower(String(t || "")).replace(/^#/, "").replace(/\s+/g, " ").trim().slice(0, 30);
+    if (v && !out.includes(v)) out.push(v);
+  }
+  return out.slice(0, 12);
+}
+
 /* ---------- Kaydı zenginleştir: sayfa bilgisi + içerik + yapay zekâ ---------- */
 // recat: kategoriyi de yapay zekâ seçsin mi · userTitle: kullanıcı başlık yazdıysa dokunma
 async function enrich(it, { recat = false, userTitle = "", userText = "" } = {}) {
@@ -705,6 +717,7 @@ async function enrich(it, { recat = false, userTitle = "", userText = "" } = {})
       if (!userTitle && ai.baslik && String(ai.baslik).length > 3 && !isGenericTitle(ai.baslik, url)) it.title = String(ai.baslik).slice(0, 160);
       if (ai.ozet) it.ozet = String(ai.ozet).slice(0, 200);
       if (ai.tur) it.tur = String(ai.tur).slice(0, 24);
+      if (Array.isArray(ai.etiketler)) it.tags = cleanTags(ai.etiketler);
       if (recat && (ai.yol || ai.kategori)) {
         const useSample = sample && AI.provider === "off";
         const r = resolvePath(ai.yol || [ai.kategori], ai.emoji, useSample || AI.newCats !== false);
@@ -727,7 +740,7 @@ async function enrichInBackground(orig, opts) {
   try { res = await enrich(copy, opts); } catch { res = { catMsg: "", aiOk: false }; }
   const cur = S.items.find(x => x.id === orig.id);
   if (!cur) return; // bu arada silindi
-  const merged = { ...cur, title: copy.title, ozet: copy.ozet, tur: copy.tur, desc: copy.desc, author: copy.author, ai: copy.ai };
+  const merged = { ...cur, title: copy.title, ozet: copy.ozet, tur: copy.tur, tags: copy.tags, desc: copy.desc, author: copy.author, ai: copy.ai };
   // kullanıcı bu arada kategoriyi elle değiştirdiyse ona dokunma
   if (cur.cat === orig.cat) { merged.cat = copy.cat; merged.auto = copy.auto; }
   delete merged.pending;
@@ -742,9 +755,9 @@ async function enrichInBackground(orig, opts) {
 async function suggestTitle(it) {
   const copy = { ...it };
   const { aiOk } = await enrich(copy, { recat: false });
-  return !isGenericTitle(copy.title, copy.url) || aiOk ? { title: copy.title, ozet: copy.ozet || "", desc: copy.desc || "", tur: copy.tur || "" } : null;
+  return !isGenericTitle(copy.title, copy.url) || aiOk ? { title: copy.title, ozet: copy.ozet || "", desc: copy.desc || "", tur: copy.tur || "", tags: copy.tags || [] } : null;
 }
-const needsAI = i => !i.ai && (i.url || i.note);
+const needsAI = i => (!i.ai || !(i.tags && i.tags.length)) && (i.url || i.note);
 async function reprocessAll(btn) {
   const list = S.items.filter(needsAI);
   if (!list.length) { toast("Düzenlenecek kayıt yok"); return; }
@@ -890,7 +903,7 @@ function render() {
   if (S.filter === "fav") arr = arr.filter(i => i.fav);
   if (S.q) {
     const words = fold(S.q).split(/\s+/).filter(Boolean);
-    arr = S.items.filter(i => { const h = fold([i.title, i.tur, i.ozet, i.desc, i.author, i.note, i.url, pathName(i.cat), pByKey(i.platform).label].join(" ")); return words.every(w => h.includes(w)); });
+    arr = S.items.filter(i => { const h = fold([i.title, i.tur, (i.tags || []).join(" "), i.ozet, i.desc, i.author, i.note, i.url, pathName(i.cat), pByKey(i.platform).label].join(" ")); return words.every(w => h.includes(w)); });
   }
   const showHome = S.sel === "home" && !S.q;
   if (showHome) arr = arr.slice(0, 15);
@@ -924,6 +937,7 @@ function itemHTML(i) {
         <span>${esc(safeUrl ? domainOf(safeUrl) : p.label)}</span><span>·</span><span>${fmtDate(i.created)}</span>
       </div>
       ${i.ozet ? `<div class="sum ai">${esc(i.ozet)}</div>` : i.desc ? `<div class="sum">${esc(String(i.desc).slice(0, 160))}</div>` : ""}
+      ${i.tags && i.tags.length ? `<div class="tags">${i.tags.map(t => `<button class="tag" data-tag="${esc(t)}">#${esc(t)}</button>`).join("")}</div>` : ""}
       ${i.note ? `<div class="note">${esc(i.note)}</div>` : ""}
       <div class="acts">
         <button class="ib" data-act="read" title="Baktım">${i.read ? "↩️" : "✅"}</button>
@@ -945,6 +959,8 @@ document.addEventListener("click", async e => {
   if (nc) { openCatEdit(null, nc.dataset.newcat || null); return; }
   const ec = e.target.closest("[data-editcat]");
   if (ec) { openCatEdit(ec.dataset.editcat); return; }
+  const tg = e.target.closest("[data-tag]");
+  if (tg) { S.q = tg.dataset.tag; $("#q").value = S.q; render(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
   const f = e.target.closest("[data-f]");
   if (f) { S.filter = f.dataset.f; document.querySelectorAll("[data-f]").forEach(b => b.classList.toggle("on", b === f)); render(); return; }
   const op = e.target.closest("[data-open]");
@@ -1004,6 +1020,7 @@ function openEdit(it) {
       <div class="row" style="flex-wrap:nowrap"><input class="field" id="eT" value="${esc(it.title)}" placeholder="Başlık" style="flex:1"><button class="btn sm" id="eAI" title="Başlığı otomatik yaz">✨</button></div>
       <input class="field" id="eU" value="${esc(it.url)}" placeholder="Link">
       <textarea class="field" id="eN" rows="3" placeholder="Not">${esc(it.note)}</textarea>
+      <input class="field" id="eG" value="${esc((it.tags || []).join(", "))}" placeholder="Etiketler (virgülle): pardus, kablosuz, ekran yansıtma">
       <select class="field" id="eC">${catOptions(it.cat)}</select>
       <div class="row" style="justify-content:flex-end"><button class="btn" id="eX">Vazgeç</button><button class="btn pri" id="eS">Kaydet</button></div>
     </div>`);
@@ -1012,12 +1029,12 @@ function openEdit(it) {
     const b = $("#eAI"); b.disabled = true; b.innerHTML = '<span class="spin"></span>';
     const r = await suggestTitle({ ...it, url: $("#eU").value.trim() });
     b.disabled = false; b.textContent = "✨";
-    if (r) { $("#eT").value = r.title; it.ozet = r.ozet || it.ozet; it.desc = r.desc || it.desc; it.tur = r.tur || it.tur; it.ai = true; }
+    if (r) { $("#eT").value = r.title; it.ozet = r.ozet || it.ozet; it.desc = r.desc || it.desc; it.tur = r.tur || it.tur; it.ai = true; if (r.tags.length) $("#eG").value = r.tags.join(", "); }
     else toast(hasAI() ? "Başlık bulunamadı" : "Sayfa başlığı alınamadı · akıllı kategoriyi açarsan yapay zekâ yazar");
   };
   $("#eS").onclick = async () => {
     const url = $("#eU").value.trim();
-    const n = { ...it, title: $("#eT").value.trim(), url, note: $("#eN").value.trim(), cat: $("#eC").value, platform: platformOf(url).k };
+    const n = { ...it, title: $("#eT").value.trim(), url, note: $("#eN").value.trim(), cat: $("#eC").value, platform: platformOf(url).k, tags: cleanTags($("#eG").value.split(",")) };
     if (n.cat !== it.cat) { n.auto = false; learnFrom(n, n.cat); }
     closeSheet(); try { await saveItem(n); toast("Güncellendi"); } catch { toast("Kaydedilemedi"); }
   };
@@ -1134,7 +1151,8 @@ $("#btnImport").onclick = () => {
     const have = new Set(S.items.map(i => i.id)); let n = 0;
     for (const it of d.items) {
       if (!it || !it.id || have.has(it.id)) continue;
-      const clean = { id: String(it.id), url: String(it.url || ""), title: String(it.title || ""), note: String(it.note || ""), platform: platformOf(it.url || "").k, cat: String(it.cat || "diger"), auto: !!it.auto, read: !!it.read, fav: !!it.fav, created: +it.created || Date.now() };
+      const clean = { id: String(it.id), url: String(it.url || ""), title: String(it.title || ""), note: String(it.note || ""), platform: platformOf(it.url || "").k, cat: String(it.cat || "diger"), auto: !!it.auto, read: !!it.read, fav: !!it.fav, created: +it.created || Date.now(),
+        ...(Array.isArray(it.tags) ? { tags: cleanTags(it.tags) } : {}), ...(it.ozet ? { ozet: String(it.ozet) } : {}), ...(it.tur ? { tur: String(it.tur) } : {}), ...(it.ai ? { ai: true } : {}) };
       try { await saveItem(clean); n++; } catch {}
     }
     toast(n + " kayıt yüklendi");
